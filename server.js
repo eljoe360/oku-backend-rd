@@ -341,5 +341,445 @@ app.get(
             );
 
             res.status(502).send(
-                'Error obteniendo segmento de Telem
+                'Error obteniendo segmento de Telemicro'
+            );
+        }
+    }
+);
+
+
+// ======================================================
+// STREAM TELEMiCRO
+// ======================================================
+
+app.get(
+    '/api/telemicro',
+    async (req, res) => {
+
+        console.log(
+            'Roku solicitó Telemicro'
+        );
+
+        const playlist =
+            await obtenerPlaylistTelemicro();
+
+        if (!playlist) {
+
+            return res.status(503).send(
+                'No se pudo obtener Telemicro'
+            );
+        }
+
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.apple.mpegurl'
+        );
+
+        res.setHeader(
+            'Cache-Control',
+            'no-cache, no-store, must-revalidate'
+        );
+
+        res.send(
+            playlist
+        );
+    }
+);
+
+
+// ======================================================
+// CANAL 6 - PLAYLIST
+// ======================================================
+
+async function obtenerPlaylistCanal6(url) {
+
+    try {
+
+        const response =
+            await axios.get(
+                url,
+                {
+                    headers: {
+                        'User-Agent':
+                            'Mozilla/5.0',
+
+                        'Accept':
+                            'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+
+                        'Referer':
+                            'https://www.elseis.do/',
+
+                        'Origin':
+                            'https://www.elseis.do/'
+                    },
+
+                    timeout: 15000,
+                    maxRedirects: 5
+                }
+            );
+
+        const playlist =
+            String(response.data);
+
+        const baseUrl =
+            new URL(url);
+
+        const nuevasLineas =
+            playlist.split('\n').map(line => {
+
+                const linea =
+                    line.trim();
+
+                if (
+                    !linea ||
+                    linea.startsWith('#')
+                ) {
+
+                    return line;
+                }
+
+                const urlCompleta =
+                    new URL(
+                        linea,
+                        baseUrl
+                    ).href;
+
+                return (
+                    '/api/canal6/proxy?url=' +
+                    encodeURIComponent(urlCompleta)
+                );
+            });
+
+        return nuevasLineas.join('\n');
+
+    } catch (error) {
+
+        console.error(
+            'ERROR CANAL 6:',
+            error.message
+        );
+
+        return null;
+    }
+}
+
+
+// ======================================================
+// PROXY CANAL 6
+// ======================================================
+
+app.get(
+    '/api/canal6/proxy',
+    async (req, res) => {
+
+        try {
+
+            const url =
+                req.query.url;
+
+            if (!url) {
+
+                return res.status(400).send(
+                    'Falta parámetro url'
+                );
+            }
+
+            if (
+                !url.startsWith(
+                    CANAL6_HOST
+                )
+            ) {
+
+                return res.status(403).send(
+                    'URL no permitida'
+                );
+            }
+
+            const response =
+                await axios.get(
+                    url,
+                    {
+                        responseType:
+                            'arraybuffer',
+
+                        headers: {
+                            'User-Agent':
+                                'Mozilla/5.0',
+
+                            'Accept':
+                                '*/*',
+
+                            'Referer':
+                                'https://www.elseis.do/',
+
+                            'Origin':
+                                'https://www.elseis.do/'
+                        },
+
+                        timeout: 15000,
+                        maxRedirects: 5
+                    }
+                );
+
+            const contentType =
+                String(
+                    response.headers['content-type'] || ''
+                ).toLowerCase();
+
+            if (
+                contentType.includes('mpegurl') ||
+                url.includes('.m3u8')
+            ) {
+
+                const playlist =
+                    Buffer
+                        .from(response.data)
+                        .toString('utf8');
+
+                const baseUrl =
+                    new URL(url);
+
+                const nuevasLineas =
+                    playlist.split('\n').map(line => {
+
+                        const linea =
+                            line.trim();
+
+                        if (
+                            !linea ||
+                            linea.startsWith('#')
+                        ) {
+
+                            return line;
+                        }
+
+                        const urlCompleta =
+                            new URL(
+                                linea,
+                                baseUrl
+                            ).href;
+
+                        return (
+                            '/api/canal6/proxy?url=' +
+                            encodeURIComponent(urlCompleta)
+                        );
+                    });
+
+                res.setHeader(
+                    'Content-Type',
+                    'application/vnd.apple.mpegurl'
+                );
+
+                return res.send(
+                    nuevasLineas.join('\n')
+                );
+            }
+
+            res.setHeader(
+                'Content-Type',
+                response.headers['content-type'] ||
+                'video/mp2t'
+            );
+
+            res.send(
+                Buffer.from(response.data)
+            );
+
+        } catch (error) {
+
+            console.error(
+                'ERROR PROXY CANAL 6:',
+                error.message
+            );
+
+            res.status(502).send(
+                'Error obteniendo Canal 6'
+            );
+        }
+    }
+);
+
+
+// ======================================================
+// STREAM CANAL 6
+// ======================================================
+
+app.get(
+    '/api/canal6',
+    async (req, res) => {
+
+        const playlist =
+            await obtenerPlaylistCanal6(
+                CANAL6_MASTER
+            );
+
+        if (!playlist) {
+
+            return res.status(503).send(
+                'No se pudo obtener Canal 6'
+            );
+        }
+
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.apple.mpegurl'
+        );
+
+        res.send(
+            playlist
+        );
+    }
+);
+
+
+// ======================================================
+// CANAL 7 - PLAYLIST
+// ======================================================
+
+async function obtenerPlaylistCanal7() {
+
+    try {
+
+        const response =
+            await axios.get(
+                CANAL7_MASTER,
+                {
+                    headers: {
+                        'User-Agent':
+                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+
+                        'Accept':
+                            '*/*',
+
+                        'Accept-Language':
+                            'es-DO,es;q=0.9,en;q=0.8',
+
+                        'Referer':
+                            'https://www.teleantillas.com.do/',
+
+                        'Origin':
+                            'https://www.teleantillas.com.do'
+                    },
+
+                    timeout: 30000,
+                    maxRedirects: 10,
+                    validateStatus: () => true
+                }
+            );
+
+        console.log(
+            'CANAL 7 HTTP:',
+            response.status
+        );
+
+        console.log(
+            'CANAL 7 RESPUESTA:',
+            String(response.data).substring(0, 500)
+        );
+
+        if (
+            response.status < 200 ||
+            response.status >= 300
+        ) {
+
+            console.log(
+                'CANAL 7 NO RESPONDE:',
+                response.status
+            );
+
+            return null;
+        }
+
+        const playlist =
+            String(response.data);
+
+        const baseUrl =
+            new URL(CANAL7_MASTER);
+
+        const nuevasLineas =
+            playlist.split('\n').map(line => {
+
+                const linea =
+                    line.trim();
+
+                if (
+                    !linea ||
+                    linea.startsWith('#')
+                ) {
+
+                    return line;
+                }
+
+                const urlCompleta =
+                    new URL(
+                        linea,
+                        baseUrl
+                    ).href;
+
+                return (
+                    '/api/canal7/proxy?url=' +
+                    encodeURIComponent(urlCompleta)
+                );
+            });
+
+        return nuevasLineas.join('\n');
+
+    } catch (error) {
+
+        console.log(
+            'ERROR CANAL 7:',
+            error.message
+        );
+
+        return null;
+    }
+}
+
+
+// ======================================================
+// PROXY CANAL 7
+// ======================================================
+
+app.get(
+    '/api/canal7/proxy',
+    async (req, res) => {
+
+        try {
+
+            const url =
+                req.query.url;
+
+            if (!url) {
+
+                return res.status(400).send(
+                    'Falta parámetro url'
+                );
+            }
+
+            if (
+                !url.startsWith(
+                    CANAL7_HOST
+                )
+            ) {
+
+                return res.status(403).send(
+                    'URL no permitida'
+                );
+            }
+
+            const response =
+                await axios.get(
+                    url,
+                    {
+                        responseType:
+                            'arraybuffer',
+
+                        headers: {
+                            'User-Agent':
+                                'Mozilla/5.0',
+
+                            'Accept':
+                                '*/*',
+
+                            'Referer':
 ```
