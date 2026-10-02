@@ -36,10 +36,13 @@ const CANAL6_HOST =
 // ======================================================
 
 const CANAL7_MASTER =
-    'https://d3gie3ig6argu.cloudfront.net/ts:abr.m3u8';
+    'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
 
 const CANAL7_HOST =
     'https://d3gie3ig6argu.cloudfront.net';
+
+const CANAL7_REFERER =
+    'https://www.teleantillas.com.do/';
 
 
 // ======================================================
@@ -692,19 +695,23 @@ async function obtenerPlaylistCanal7() {
                 {
                     headers: {
                         'User-Agent':
-                            'Mozilla/5.0',
+                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
 
                         'Accept':
                             'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
 
                         'Accept-Language':
-                            'es-DO,es;q=0.9,en;q=0.8'
+                            'es-DO,es;q=0.9,en;q=0.8',
+
+                        'Referer':
+                            CANAL7_REFERER,
+
+                        'Origin':
+                            'https://www.teleantillas.com.do'
                     },
 
                     timeout: 30000,
-
                     maxRedirects: 10,
-
                     validateStatus: () => true
                 }
             );
@@ -714,11 +721,6 @@ async function obtenerPlaylistCanal7() {
             response.status
         );
 
-        console.log(
-            'CANAL 7 CONTENT-TYPE:',
-            response.headers['content-type']
-        );
-
         if (
             response.status < 200 ||
             response.status >= 300
@@ -726,8 +728,7 @@ async function obtenerPlaylistCanal7() {
 
             console.error(
                 'CANAL 7 RESPONDIÓ:',
-                response.status,
-                String(response.data).substring(0, 300)
+                response.status
             );
 
             return null;
@@ -737,11 +738,6 @@ async function obtenerPlaylistCanal7() {
             Buffer
                 .from(response.data)
                 .toString('utf8');
-
-        console.log(
-            'CANAL 7 PLAYLIST:',
-            playlist.substring(0, 300)
-        );
 
         const baseUrl =
             new URL(
@@ -820,13 +816,18 @@ app.get(
                 )
             ) {
 
+                console.error(
+                    'CANAL 7 URL BLOQUEADA:',
+                    url
+                );
+
                 return res.status(403).send(
                     'URL no permitida'
                 );
             }
 
             console.log(
-                'Proxy Canal 7:',
+                'CANAL 7 PROXY:',
                 url
             );
 
@@ -839,13 +840,19 @@ app.get(
 
                         headers: {
                             'User-Agent':
-                                'Mozilla/5.0',
+                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
 
                             'Accept':
                                 '*/*',
 
                             'Accept-Language':
-                                'es-DO,es;q=0.9,en;q=0.8'
+                                'es-DO,es;q=0.9,en;q=0.8',
+
+                            'Referer':
+                                CANAL7_REFERER,
+
+                            'Origin':
+                                'https://www.teleantillas.com.do'
                         },
 
                         timeout: 30000,
@@ -857,8 +864,10 @@ app.get(
                 );
 
             console.log(
-                'Canal 7 proxy HTTP:',
-                response.status
+                'CANAL 7 SEGMENTO HTTP:',
+                response.status,
+                'SIZE:',
+                response.data.length
             );
 
             if (
@@ -941,13 +950,24 @@ app.get(
                 );
             }
 
+            res.statusCode = 200;
+
             res.setHeader(
                 'Content-Type',
-                response.headers['content-type'] ||
                 'video/mp2t'
             );
 
-            res.send(
+            res.setHeader(
+                'Cache-Control',
+                'no-cache, no-store, must-revalidate'
+            );
+
+            res.setHeader(
+                'Content-Length',
+                response.data.length
+            );
+
+            return res.end(
                 Buffer.from(
                     response.data
                 )
@@ -961,7 +981,7 @@ app.get(
             );
 
             res.status(502).send(
-                'Error obteniendo Canal 7'
+                'Error obteniendo segmento de Canal 7'
             );
         }
     }
