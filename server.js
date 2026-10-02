@@ -48,16 +48,12 @@ const CANAL7_HOST =
 
 
 // ======================================================
-// OBTENER STREAM DINÁMICO DE TELEMICRO
+// TELEMiCRO - OBTENER STREAM
 // ======================================================
 
 async function obtenerStreamTelemicro() {
 
     try {
-
-        console.log('======================================');
-        console.log('BUSCANDO NUEVA SESIÓN DE TELEMICRO');
-        console.log('======================================');
 
         const sessionRes =
             await axios.get(
@@ -80,11 +76,6 @@ async function obtenerStreamTelemicro() {
             sessionRes.headers['set-cookie']
                 ? sessionRes.headers['set-cookie'].join('; ')
                 : '';
-
-        console.log(
-            'Cookies Telemicro:',
-            cookies ? 'OBTENIDAS' : 'NINGUNA'
-        );
 
         const playlistRes =
             await axios.get(
@@ -133,11 +124,6 @@ async function obtenerStreamTelemicro() {
                 ? playlistRes.data
                 : String(playlistRes.data);
 
-        console.log(
-            'Playlist recibida:',
-            playlist.substring(0, 500)
-        );
-
         const match =
             playlist.match(
                 /(?:https?:\/\/[^"\s]+\/)?chunks\.m3u8(?:\?[^"\s]+)?/i
@@ -168,14 +154,6 @@ async function obtenerStreamTelemicro() {
                     streamUrl;
             }
 
-            console.log(
-                'STREAM TELEMICRO ENCONTRADO:'
-            );
-
-            console.log(
-                streamUrl
-            );
-
             telemicroSession = {
                 streamUrl: streamUrl,
                 cookies: cookies,
@@ -201,14 +179,6 @@ async function obtenerStreamTelemicro() {
             const streamUrl =
                 `${TELEMICRO_BASE}chunks.m3u8?nimblesessionid=${sessionId}`;
 
-            console.log(
-                'STREAM TELEMICRO POR SESSION ID:'
-            );
-
-            console.log(
-                streamUrl
-            );
-
             telemicroSession = {
                 streamUrl: streamUrl,
                 cookies: cookies,
@@ -219,16 +189,13 @@ async function obtenerStreamTelemicro() {
         }
 
         throw new Error(
-            'No se encontró chunks.m3u8 ni nimblesessionid en la playlist'
+            'No se encontró chunks.m3u8 ni nimblesessionid'
         );
 
     } catch (error) {
 
         console.error(
-            'ERROR OBTENIENDO TELEMICRO:'
-        );
-
-        console.error(
+            'ERROR OBTENIENDO TELEMICRO:',
             error.message
         );
 
@@ -238,7 +205,7 @@ async function obtenerStreamTelemicro() {
 
 
 // ======================================================
-// OBTENER PLAYLIST DE TELEMICRO
+// TELEMiCRO - PLAYLIST
 // ======================================================
 
 async function obtenerPlaylistTelemicro() {
@@ -269,7 +236,7 @@ async function obtenerPlaylistTelemicro() {
                 {
                     headers: {
                         'User-Agent':
-                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                            'Mozilla/5.0',
 
                         'Accept':
                             'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
@@ -323,15 +290,12 @@ async function obtenerPlaylistTelemicro() {
                 }
             );
 
-        playlist =
-            nuevasLineas.join('\n');
-
-        return playlist;
+        return nuevasLineas.join('\n');
 
     } catch (error) {
 
         console.error(
-            'Error obteniendo playlist proxy:',
+            'ERROR PLAYLIST TELEMiCRO:',
             error.message
         );
 
@@ -371,7 +335,7 @@ app.get(
 
                         headers: {
                             'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                                'Mozilla/5.0',
 
                             'Accept':
                                 '*/*',
@@ -390,14 +354,10 @@ app.get(
                     }
                 );
 
-            const contentType =
-                response.headers[
-                    'content-type'
-                ] || 'video/mp2t';
-
             res.setHeader(
                 'Content-Type',
-                contentType
+                response.headers['content-type'] ||
+                'video/mp2t'
             );
 
             res.setHeader(
@@ -414,7 +374,7 @@ app.get(
         } catch (error) {
 
             console.error(
-                'ERROR EN PROXY TELEMiCRO:',
+                'ERROR PROXY TELEMiCRO:',
                 error.message
             );
 
@@ -427,7 +387,7 @@ app.get(
 
 
 // ======================================================
-// STREAM PRINCIPAL TELEMiCRO
+// STREAM TELEMiCRO
 // ======================================================
 
 app.get(
@@ -466,8 +426,7 @@ app.get(
 
 
 // ======================================================
-// CANAL 6
-// OBTENER Y REESCRIBIR PLAYLIST
+// CANAL 6 - PLAYLIST
 // ======================================================
 
 async function obtenerPlaylistCanal6(url) {
@@ -485,7 +444,7 @@ async function obtenerPlaylistCanal6(url) {
                 {
                     headers: {
                         'User-Agent':
-                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                            'Mozilla/5.0',
 
                         'Accept':
                             'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
@@ -498,24 +457,18 @@ async function obtenerPlaylistCanal6(url) {
                     },
 
                     timeout: 15000,
-
                     maxRedirects: 5
                 }
             );
 
-        let playlist =
-            typeof response.data === 'string'
-                ? response.data
-                : String(response.data);
+        const playlist =
+            String(response.data);
 
         const baseUrl =
             new URL(url);
 
-        const lines =
-            playlist.split('\n');
-
         const nuevasLineas =
-            lines.map(
+            playlist.split('\n').map(
                 line => {
 
                     const linea =
@@ -531,31 +484,6 @@ async function obtenerPlaylistCanal6(url) {
                     if (
                         linea.startsWith('#')
                     ) {
-
-                        if (
-                            linea.includes('URI="')
-                        ) {
-
-                            return linea.replace(
-                                /URI="([^"]+)"/g,
-                                (match, uri) => {
-
-                                    const urlCompleta =
-                                        new URL(
-                                            uri,
-                                            baseUrl
-                                        ).href;
-
-                                    return (
-                                        'URI="/api/canal6/proxy?url=' +
-                                        encodeURIComponent(
-                                            urlCompleta
-                                        ) +
-                                        '"'
-                                    );
-                                }
-                            );
-                        }
 
                         return line;
                     }
@@ -575,15 +503,12 @@ async function obtenerPlaylistCanal6(url) {
                 }
             );
 
-        playlist =
-            nuevasLineas.join('\n');
-
-        return playlist;
+        return nuevasLineas.join('\n');
 
     } catch (error) {
 
         console.error(
-            'ERROR OBTENIENDO PLAYLIST CANAL 6:',
+            'ERROR CANAL 6:',
             error.message
         );
 
@@ -623,11 +548,6 @@ app.get(
                 );
             }
 
-            console.log(
-                'Canal 6 proxy:',
-                url
-            );
-
             const response =
                 await axios.get(
                     url,
@@ -637,7 +557,7 @@ app.get(
 
                         headers: {
                             'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                                'Mozilla/5.0',
 
                             'Accept':
                                 '*/*',
@@ -650,89 +570,39 @@ app.get(
                         },
 
                         timeout: 15000,
-
                         maxRedirects: 5
                     }
                 );
 
             const contentType =
                 String(
-                    response.headers[
-                        'content-type'
-                    ] || ''
+                    response.headers['content-type'] || ''
                 ).toLowerCase();
 
-            const esPlaylist =
-                contentType.includes(
-                    'mpegurl'
-                ) ||
-                url.includes(
-                    '.m3u8'
-                );
-
             if (
-                esPlaylist
+                contentType.includes('mpegurl') ||
+                url.includes('.m3u8')
             ) {
 
                 const playlist =
                     Buffer
-                        .from(
-                            response.data
-                        )
-                        .toString(
-                            'utf8'
-                        );
+                        .from(response.data)
+                        .toString('utf8');
 
                 const baseUrl =
                     new URL(url);
 
-                const lines =
-                    playlist.split('\n');
-
                 const nuevasLineas =
-                    lines.map(
+                    playlist.split('\n').map(
                         line => {
 
                             const linea =
                                 line.trim();
 
                             if (
-                                !linea
-                            ) {
-
-                                return line;
-                            }
-
-                            if (
+                                !linea ||
                                 linea.startsWith('#')
                             ) {
-
-                                if (
-                                    linea.includes(
-                                        'URI="'
-                                    )
-                                ) {
-
-                                    return linea.replace(
-                                        /URI="([^"]+)"/g,
-                                        (match, uri) => {
-
-                                            const urlCompleta =
-                                                new URL(
-                                                    uri,
-                                                    baseUrl
-                                                ).href;
-
-                                            return (
-                                                'URI="/api/canal6/proxy?url=' +
-                                                encodeURIComponent(
-                                                    urlCompleta
-                                                ) +
-                                                '"'
-                                            );
-                                        }
-                                    );
-                                }
 
                                 return line;
                             }
@@ -752,43 +622,24 @@ app.get(
                         }
                     );
 
-                const playlistFinal =
-                    nuevasLineas.join('\n');
-
                 res.setHeader(
                     'Content-Type',
                     'application/vnd.apple.mpegurl'
                 );
 
-                res.setHeader(
-                    'Cache-Control',
-                    'no-cache, no-store, must-revalidate'
-                );
-
                 return res.send(
-                    playlistFinal
+                    nuevasLineas.join('\n')
                 );
             }
 
-            const tipo =
-                response.headers[
-                    'content-type'
-                ] || 'video/mp2t';
-
             res.setHeader(
                 'Content-Type',
-                tipo
+                response.headers['content-type'] ||
+                'video/mp2t'
             );
 
-            res.setHeader(
-                'Cache-Control',
-                'no-cache, no-store, must-revalidate'
-            );
-
-            return res.send(
-                Buffer.from(
-                    response.data
-                )
+            res.send(
+                Buffer.from(response.data)
             );
 
         } catch (error) {
@@ -798,7 +649,7 @@ app.get(
                 error.message
             );
 
-            return res.status(502).send(
+            res.status(502).send(
                 'Error obteniendo Canal 6'
             );
         }
@@ -807,16 +658,12 @@ app.get(
 
 
 // ======================================================
-// STREAM PRINCIPAL CANAL 6
+// STREAM CANAL 6
 // ======================================================
 
 app.get(
     '/api/canal6',
     async (req, res) => {
-
-        console.log(
-            'Roku solicitó Canal 6'
-        );
 
         const playlist =
             await obtenerPlaylistCanal6(
@@ -835,11 +682,6 @@ app.get(
             'application/vnd.apple.mpegurl'
         );
 
-        res.setHeader(
-            'Cache-Control',
-            'no-cache, no-store, must-revalidate'
-        );
-
         res.send(
             playlist
         );
@@ -848,18 +690,18 @@ app.get(
 
 
 // ======================================================
-// CANAL 7
-// OBTENER Y REESCRIBIR PLAYLIST
+// CANAL 7 - PLAYLIST
 // ======================================================
 
 async function obtenerPlaylistCanal7(url) {
 
     try {
 
-        console.log(
-            'Canal 7 solicitando:',
-            url
-        );
+        console.log('======================================');
+        console.log('CANAL 7');
+        console.log('SOLICITANDO PLAYLIST:');
+        console.log(url);
+        console.log('======================================');
 
         const response =
             await axios.get(
@@ -867,31 +709,69 @@ async function obtenerPlaylistCanal7(url) {
                 {
                     headers: {
                         'User-Agent':
-                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
 
                         'Accept':
-                            'application/vnd.apple.mpegurl, application/x-mpegURL, */*'
+                            'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+
+                        'Accept-Language':
+                            'es-DO,es;q=0.9,en;q=0.8',
+
+                        'Referer':
+                            'https://www.teleantillas.com.do/',
+
+                        'Origin':
+                            'https://www.teleantillas.com.do/',
+
+                        'Connection':
+                            'keep-alive'
                     },
 
                     timeout: 15000,
-
-                    maxRedirects: 5
+                    maxRedirects: 5,
+                    validateStatus: () => true
                 }
             );
 
-        let playlist =
-            typeof response.data === 'string'
-                ? response.data
-                : String(response.data);
+        console.log(
+            'HTTP CANAL 7:',
+            response.status
+        );
+
+        if (
+            response.status < 200 ||
+            response.status >= 300
+        ) {
+
+            console.error(
+                'CloudFront respondió:',
+                response.status
+            );
+
+            console.error(
+                'Respuesta:',
+                String(response.data).substring(0, 500)
+            );
+
+            return null;
+        }
+
+        const playlist =
+            String(response.data);
+
+        console.log(
+            'PLAYLIST CANAL 7 RECIBIDA:'
+        );
+
+        console.log(
+            playlist.substring(0, 1000)
+        );
 
         const baseUrl =
             new URL(url);
 
-        const lines =
-            playlist.split('\n');
-
         const nuevasLineas =
-            lines.map(
+            playlist.split('\n').map(
                 line => {
 
                     const linea =
@@ -908,33 +788,6 @@ async function obtenerPlaylistCanal7(url) {
                         linea.startsWith('#')
                     ) {
 
-                        if (
-                            linea.includes(
-                                'URI="'
-                            )
-                        ) {
-
-                            return linea.replace(
-                                /URI="([^"]+)"/g,
-                                (match, uri) => {
-
-                                    const urlCompleta =
-                                        new URL(
-                                            uri,
-                                            baseUrl
-                                        ).href;
-
-                                    return (
-                                        'URI="/api/canal7/proxy?url=' +
-                                        encodeURIComponent(
-                                            urlCompleta
-                                        ) +
-                                        '"'
-                                    );
-                                }
-                            );
-                        }
-
                         return line;
                     }
 
@@ -943,6 +796,11 @@ async function obtenerPlaylistCanal7(url) {
                             linea,
                             baseUrl
                         ).href;
+
+                    console.log(
+                        'SEGMENTO CANAL 7:',
+                        urlCompleta
+                    );
 
                     return (
                         '/api/canal7/proxy?url=' +
@@ -953,10 +811,7 @@ async function obtenerPlaylistCanal7(url) {
                 }
             );
 
-        playlist =
-            nuevasLineas.join('\n');
-
-        return playlist;
+        return nuevasLineas.join('\n');
 
     } catch (error) {
 
@@ -1015,96 +870,52 @@ app.get(
 
                         headers: {
                             'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
 
                             'Accept':
-                                '*/*'
+                                '*/*',
+
+                            'Referer':
+                                'https://www.teleantillas.com.do/',
+
+                            'Origin':
+                                'https://www.teleantillas.com.do/'
                         },
 
                         timeout: 15000,
-
                         maxRedirects: 5
                     }
                 );
 
             const contentType =
                 String(
-                    response.headers[
-                        'content-type'
-                    ] || ''
+                    response.headers['content-type'] || ''
                 ).toLowerCase();
 
-            const esPlaylist =
-                contentType.includes(
-                    'mpegurl'
-                ) ||
-                url.includes(
-                    '.m3u8'
-                );
-
             if (
-                esPlaylist
+                contentType.includes('mpegurl') ||
+                url.includes('.m3u8')
             ) {
 
                 const playlist =
                     Buffer
-                        .from(
-                            response.data
-                        )
-                        .toString(
-                            'utf8'
-                        );
+                        .from(response.data)
+                        .toString('utf8');
 
                 const baseUrl =
                     new URL(url);
 
-                const lines =
-                    playlist.split('\n');
-
                 const nuevasLineas =
-                    lines.map(
+                    playlist.split('\n').map(
                         line => {
 
                             const linea =
                                 line.trim();
 
                             if (
-                                !linea
-                            ) {
-
-                                return line;
-                            }
-
-                            if (
+                                !linea ||
                                 linea.startsWith('#')
                             ) {
-
-                                if (
-                                    linea.includes(
-                                        'URI="'
-                                    )
-                                ) {
-
-                                    return linea.replace(
-                                        /URI="([^"]+)"/g,
-                                        (match, uri) => {
-
-                                            const urlCompleta =
-                                                new URL(
-                                                    uri,
-                                                    baseUrl
-                                                ).href;
-
-                                            return (
-                                                'URI="/api/canal7/proxy?url=' +
-                                                encodeURIComponent(
-                                                    urlCompleta
-                                                ) +
-                                                '"'
-                                            );
-                                        }
-                                    );
-                                }
 
                                 return line;
                             }
@@ -1124,9 +935,6 @@ app.get(
                         }
                     );
 
-                const playlistFinal =
-                    nuevasLineas.join('\n');
-
                 res.setHeader(
                     'Content-Type',
                     'application/vnd.apple.mpegurl'
@@ -1138,18 +946,14 @@ app.get(
                 );
 
                 return res.send(
-                    playlistFinal
+                    nuevasLineas.join('\n')
                 );
             }
 
-            const tipo =
-                response.headers[
-                    'content-type'
-                ] || 'video/mp2t';
-
             res.setHeader(
                 'Content-Type',
-                tipo
+                response.headers['content-type'] ||
+                'video/mp2t'
             );
 
             res.setHeader(
@@ -1158,9 +962,7 @@ app.get(
             );
 
             return res.send(
-                Buffer.from(
-                    response.data
-                )
+                Buffer.from(response.data)
             );
 
         } catch (error) {
@@ -1179,7 +981,7 @@ app.get(
 
 
 // ======================================================
-// STREAM PRINCIPAL CANAL 7
+// STREAM CANAL 7
 // ======================================================
 
 app.get(
@@ -1260,29 +1062,23 @@ app.get(
                 );
 
             const resultados =
-                await Promise.all(
-                    vigentes.map(
-                        async canal => {
+                vigentes.map(
+                    canal => {
 
-                            const c = {
-                                ...canal
-                            };
+                        const c = {
+                            ...canal
+                        };
 
-                            if (
-                                c.telemicro_web
-                            ) {
+                        if (
+                            c.telemicro_web
+                        ) {
 
-                                console.log(
-                                    'Buscando nueva sesión de Telemicro...'
-                                );
-
-                                c.url =
-                                    'https://oku-backend-rd.onrender.com/api/telemicro';
-                            }
-
-                            return c;
+                            c.url =
+                                'https://oku-backend-rd.onrender.com/api/telemicro';
                         }
-                    )
+
+                        return c;
+                    }
                 );
 
             res.json(
@@ -1292,7 +1088,7 @@ app.get(
         } catch (error) {
 
             console.error(
-                'Error general en backend:',
+                'ERROR GENERAL:',
                 error.message
             );
 
