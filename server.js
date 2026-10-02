@@ -1,6 +1,5 @@
 const express = require('express');
 const axios = require('axios');
-const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -12,7 +11,8 @@ async function obtenerStreamDailymotion(idVideo) {
         const response = await axios.get(`https://www.dailymotion.com/player/metadata/video/${idVideo}`, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+            },
+            timeout: 5000
         });
         
         if (response.data && response.data.qualities && response.data.qualities.auto) {
@@ -26,8 +26,18 @@ async function obtenerStreamDailymotion(idVideo) {
 
 app.get('/api/canales', async (req, res) => {
     try {
-        const response = await axios.get(GITHUB_JSON_URL);
-        const canales = response.data;
+        const response = await axios.get(GITHUB_JSON_URL, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        });
+
+        // Asegurar que obtenemos una lista/arreglo
+        let canales = response.data;
+        if (typeof canales === 'string') {
+            canales = JSON.parse(canales);
+        }
+
         const hoy = new Date().toISOString().split('T')[0];
 
         // Filtrar canales no vencidos
@@ -36,7 +46,7 @@ app.get('/api/canales', async (req, res) => {
             return canal.vencimiento >= hoy;
         });
 
-        // Resolver enlaces automáticos dinámicos (ej: DailyMotion / Color Visión)
+        // Resolver enlaces automáticos dinámicos (ej: DailyMotion)
         const canalesProcesados = await Promise.all(
             canalesValidos.map(async (canal) => {
                 if (canal.dailymotion_id) {
@@ -52,7 +62,7 @@ app.get('/api/canales', async (req, res) => {
         res.json(canalesProcesados);
     } catch (error) {
         console.error('Error al procesar los canales:', error.message);
-        res.status(500).json({ error: 'Error al obtener la lista de canales' });
+        res.status(500).json({ error: 'Error al obtener la lista de canales', detalle: error.message });
     }
 });
 
