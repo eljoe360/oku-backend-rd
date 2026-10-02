@@ -12,7 +12,7 @@ async function obtenerStreamDailymotion(idVideo) {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
             },
-            timeout: 5000
+            timeout: 4000
         });
         
         if (response.data && response.data.qualities && response.data.qualities.auto) {
@@ -24,27 +24,26 @@ async function obtenerStreamDailymotion(idVideo) {
     return null;
 }
 
-// Obtener nimblesessionid fresco para Telemicro
+// Extraer sesión de Telemicro
 async function obtenerStreamTelemicro(paginaUrl) {
     try {
         const response = await axios.get(paginaUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
             },
-            timeout: 5000
+            timeout: 4000
         });
 
-        // Buscar patrón de URL de chunks o playlist con nimblesessionid
-        const match = response.data.match(/https?:\/\/[^"']+\/chunks\.m3u8\?nimblesessionid=\d+/i) ||
-                      response.data.match(/https?:\/\/[^"']+\/playlist\.m3u8\?nimblesessionid=\d+/i);
+        const html = response.data;
+        const match = html.match(/https?:\/\/[^"'\s]+\.(?:m3u8)(?:\?[^"'\s]+)?/i);
 
         if (match) {
             return match[0];
         }
     } catch (error) {
-        console.error(`Error al obtener sesión de Telemicro:`, error.message);
+        console.error(`Error al extraer Telemicro:`, error.message);
     }
-    return null;
+    return "https://live2.telemicro.com.do/live/55/chunks.m3u8";
 }
 
 app.get('/api/canales', async (req, res) => {
@@ -69,17 +68,28 @@ app.get('/api/canales', async (req, res) => {
         // Procesar resolución dinámica de fuentes
         const canalesProcesados = await Promise.all(
             canalesValidos.map(async (canal) => {
-                if (canal.dailymotion_id) {
-                    const urlFresca = await obtenerStreamDailymotion(canal.dailymotion_id);
-                    if (urlFresca) return { ...canal, url: urlFresca };
+                let canalCopia = { ...canal };
+
+                if (canalCopia.dailymotion_id) {
+                    const urlFresca = await obtenerStreamDailymotion(canalCopia.dailymotion_id);
+                    if (urlFresca) {
+                        canalCopia.url = urlFresca;
+                    }
                 }
                 
-                if (canal.telemicro_web) {
-                    const urlFresca = await obtenerStreamTelemicro(canal.telemicro_web);
-                    if (urlFresca) return { ...canal, url: urlFresca };
+                if (canalCopia.telemicro_web) {
+                    const urlFresca = await obtenerStreamTelemicro(canalCopia.telemicro_web);
+                    if (urlFresca) {
+                        canalCopia.url = urlFresca;
+                    }
                 }
 
-                return canal;
+                // Respaldo de seguridad para que NUNCA quede vacía la URL
+                if (!canalCopia.url) {
+                    canalCopia.url = "https://cdn.protvradiostream.com/canal4rd-1/ngrp:canal4rd-1_all/playlist.m3u8";
+                }
+
+                return canalCopia;
             })
         );
 
