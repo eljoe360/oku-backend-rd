@@ -1,4 +1,3 @@
-```javascript
 const express = require('express');
 const axios = require('axios');
 
@@ -56,51 +55,49 @@ async function obtenerStreamTelemicro() {
 
     try {
 
-        const sessionRes =
-            await axios.get(
-                'https://telemicro.com.do/telemicro-en-vivo/',
-                {
-                    headers: {
-                        'User-Agent':
-                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
-                    },
+        const sessionRes = await axios.get(
+            'https://telemicro.com.do/telemicro-en-vivo/',
+            {
+                headers: {
+                    'User-Agent':
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+                },
 
-                    timeout: 15000,
-                    maxRedirects: 5
-                }
-            );
+                timeout: 15000,
+                maxRedirects: 5
+            }
+        );
 
         const cookies =
             sessionRes.headers['set-cookie']
                 ? sessionRes.headers['set-cookie'].join('; ')
                 : '';
 
-        const playlistRes =
-            await axios.get(
-                TELEMICRO_PLAYLIST,
-                {
-                    headers: {
-                        'User-Agent':
-                            'Mozilla/5.0',
+        const playlistRes = await axios.get(
+            TELEMICRO_PLAYLIST,
+            {
+                headers: {
+                    'User-Agent':
+                        'Mozilla/5.0',
 
-                        'Accept':
-                            'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+                    'Accept':
+                        'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
 
-                        'Referer':
-                            'https://telemicro.com.do/',
+                    'Referer':
+                        'https://telemicro.com.do/',
 
-                        'Origin':
-                            'https://telemicro.com.do/',
+                    'Origin':
+                        'https://telemicro.com.do/',
 
-                        'Cookie':
-                            cookies
-                    },
+                    'Cookie':
+                        cookies
+                },
 
-                    timeout: 15000,
-                    maxRedirects: 5,
-                    validateStatus: () => true
-                }
-            );
+                timeout: 15000,
+                maxRedirects: 5,
+                validateStatus: () => true
+            }
+        );
 
         console.log(
             'Respuesta playlist Telemicro:',
@@ -156,6 +153,11 @@ async function obtenerStreamTelemicro() {
                 updatedAt: Date.now()
             };
 
+            console.log(
+                'Nuevo stream Telemicro:',
+                streamUrl
+            );
+
             return streamUrl;
         }
 
@@ -177,6 +179,11 @@ async function obtenerStreamTelemicro() {
                 cookies: cookies,
                 updatedAt: Date.now()
             };
+
+            console.log(
+                'Nuevo stream Telemicro:',
+                streamUrl
+            );
 
             return streamUrl;
         }
@@ -645,6 +652,10 @@ app.get(
     '/api/canal6',
     async (req, res) => {
 
+        console.log(
+            'Roku solicitó Canal 6'
+        );
+
         const playlist =
             await obtenerPlaylistCanal6(
                 CANAL6_MASTER
@@ -662,6 +673,11 @@ app.get(
         res.setHeader(
             'Content-Type',
             'application/vnd.apple.mpegurl'
+        );
+
+        res.setHeader(
+            'Cache-Control',
+            'no-cache, no-store, must-revalidate'
         );
 
         res.send(
@@ -898,5 +914,179 @@ app.get(
                 );
             }
 
-            res.setHea
-```
+            res.setHeader(
+                'Content-Type',
+                response.headers['content-type'] ||
+                'video/mp2t'
+            );
+
+            res.send(
+                Buffer.from(
+                    response.data
+                )
+            );
+
+        } catch (error) {
+
+            console.error(
+                'ERROR PROXY CANAL 7:',
+                error.message
+            );
+
+            res.status(502).send(
+                'Error obteniendo Canal 7'
+            );
+        }
+    }
+);
+
+
+// ======================================================
+// STREAM CANAL 7
+// ======================================================
+
+app.get(
+    '/api/canal7',
+    async (req, res) => {
+
+        console.log(
+            'Roku solicitó Canal 7'
+        );
+
+        const playlist =
+            await obtenerPlaylistCanal7();
+
+        if (
+            !playlist
+        ) {
+
+            return res.status(503).send(
+                'No se pudo obtener Canal 7'
+            );
+        }
+
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.apple.mpegurl'
+        );
+
+        res.setHeader(
+            'Cache-Control',
+            'no-cache, no-store, must-revalidate'
+        );
+
+        res.send(
+            playlist
+        );
+    }
+);
+
+
+// ======================================================
+// API DE CANALES
+// ======================================================
+
+app.get(
+    '/api/canales',
+    async (req, res) => {
+
+        try {
+
+            const response =
+                await axios.get(
+                    GITHUB_JSON_URL,
+                    {
+                        headers: {
+                            'User-Agent':
+                                'Mozilla/5.0'
+                        },
+
+                        timeout: 10000
+                    }
+                );
+
+            let canales =
+                typeof response.data === 'string'
+                    ? JSON.parse(response.data)
+                    : response.data;
+
+            const hoy =
+                new Date()
+                    .toISOString()
+                    .split('T')[0];
+
+            const vigentes =
+                canales.filter(
+                    canal =>
+                        !canal.vencimiento ||
+                        canal.vencimiento >= hoy
+                );
+
+            const resultados =
+                vigentes.map(
+                    canal => {
+
+                        const c = {
+                            ...canal
+                        };
+
+                        if (
+                            c.telemicro_web
+                        ) {
+
+                            c.url =
+                                'https://oku-backend-rd.onrender.com/api/telemicro';
+                        }
+
+                        return c;
+                    }
+                );
+
+            res.json(
+                resultados
+            );
+
+        } catch (error) {
+
+            console.error(
+                'ERROR GENERAL:',
+                error.message
+            );
+
+            res.status(500).json({
+                error:
+                    'Error al procesar la lista de canales'
+            });
+        }
+    }
+);
+
+
+// ======================================================
+// PRUEBA DEL SERVIDOR
+// ======================================================
+
+app.get(
+    '/',
+    (req, res) => {
+
+        res.send(
+            'OKU Backend RD funcionando'
+        );
+    }
+);
+
+
+// ======================================================
+// INICIAR SERVIDOR
+// ======================================================
+
+app.listen(
+    PORT,
+    () => {
+
+        console.log(
+            `Servidor activo en el puerto ${PORT}`
+        );
+    }
+);
