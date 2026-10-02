@@ -1,11 +1,25 @@
+```javascript
 const express = require('express');
 const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+
+// ======================================================
+// GITHUB
+// ======================================================
+
 const GITHUB_JSON_URL =
     'https://raw.githubusercontent.com/eljoe360/channels.roku/main/channels.json';
+
+
+// ======================================================
+// TELEMICRO
+// ======================================================
+
+const TELEMICRO_PAGE =
+    'https://telemicro.com.do/telemicro-en-vivo/';
 
 const TELEMICRO_PLAYLIST =
     'https://live2.telemicro.com.do/live/55/playlist.m3u8';
@@ -15,79 +29,154 @@ const TELEMICRO_BASE =
 
 
 // ======================================================
-// OBTENER STREAM DINÁMICO DE TELEMICRO
+// USER AGENT
 // ======================================================
-async function obtenerStreamTelemicro() {
+
+const USER_AGENT =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36';
+
+
+// ======================================================
+// VARIABLES PARA GUARDAR SESIÓN
+// ======================================================
+
+let telemicroCookies = '';
+
+let ultimoStreamTelemicro = null;
+
+let ultimaActualizacion = 0;
+
+
+// ======================================================
+// OBTENER COOKIES DE TELEMIRO
+// ======================================================
+
+async function obtenerCookiesTelemicro() {
 
     try {
 
-        // ------------------------------------------------
-        // 1. Abrir página de Telemicro para obtener cookies
-        // ------------------------------------------------
-        const sessionRes = await axios.get(
-            'https://telemicro.com.do/telemicro-en-vivo/',
+        const response = await axios.get(
+            TELEMICRO_PAGE,
             {
                 headers: {
-                    'User-Agent':
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                    'User-Agent': USER_AGENT,
 
                     'Accept':
                         'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
                 },
 
-                timeout: 10000,
-
-                // No necesitamos seguir redirecciones manualmente aquí
-                maxRedirects: 5
-            }
-        );
-
-
-        // ------------------------------------------------
-        // 2. Obtener cookies
-        // ------------------------------------------------
-        const cookies =
-            sessionRes.headers['set-cookie']
-                ? sessionRes.headers['set-cookie'].join('; ')
-                : '';
-
-
-        console.log(
-            'Cookies Telemicro:',
-            cookies ? 'OBTENIDAS' : 'NINGUNA'
-        );
-
-
-        // ------------------------------------------------
-        // 3. Pedir playlist principal
-        // ------------------------------------------------
-        const playlistRes = await axios.get(
-            TELEMICRO_PLAYLIST,
-            {
-                headers: {
-                    'User-Agent':
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-
-                    'Accept':
-                        'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
-
-                    'Referer':
-                        'https://telemicro.com.do/',
-
-                    'Origin':
-                        'https://telemicro.com.do/',
-
-                    'Cookie':
-                        cookies
-                },
-
-                timeout: 10000,
+                timeout: 15000,
 
                 maxRedirects: 5,
 
                 validateStatus: () => true
             }
         );
+
+
+        const setCookie =
+            response.headers['set-cookie'];
+
+
+        if (setCookie && setCookie.length > 0) {
+
+            telemicroCookies =
+                setCookie
+                    .map(cookie =>
+                        cookie.split(';')[0]
+                    )
+                    .join('; ');
+
+            console.log(
+                'Cookies Telemicro: OBTENIDAS'
+            );
+
+        } else {
+
+            console.log(
+                'Cookies Telemicro: NINGUNA'
+            );
+        }
+
+
+        return telemicroCookies;
+
+    }
+
+    catch (error) {
+
+        console.error(
+            'Error obteniendo cookies:',
+            error.message
+        );
+
+        return telemicroCookies;
+    }
+}
+
+
+
+// ======================================================
+// OBTENER STREAM DINÁMICO DE TELEMIRO
+// ======================================================
+
+async function obtenerStreamTelemicro() {
+
+    try {
+
+        console.log(
+            '=========================================='
+        );
+
+        console.log(
+            'BUSCANDO NUEVA SESIÓN DE TELEMIRO'
+        );
+
+        console.log(
+            '=========================================='
+        );
+
+
+        // ------------------------------------------------
+        // 1. Obtener cookies
+        // ------------------------------------------------
+
+        await obtenerCookiesTelemicro();
+
+
+        // ------------------------------------------------
+        // 2. Pedir playlist principal
+        // ------------------------------------------------
+
+        const playlistRes =
+            await axios.get(
+                TELEMICRO_PLAYLIST,
+                {
+                    headers: {
+
+                        'User-Agent':
+                            USER_AGENT,
+
+                        'Accept':
+                            'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+
+                        'Referer':
+                            TELEMICRO_PAGE,
+
+                        'Origin':
+                            'https://telemicro.com.do',
+
+                        'Cookie':
+                            telemicroCookies
+                    },
+
+                    timeout: 15000,
+
+                    maxRedirects: 5,
+
+                    validateStatus: () => true
+                }
+            );
 
 
         console.log(
@@ -97,8 +186,9 @@ async function obtenerStreamTelemicro() {
 
 
         // ------------------------------------------------
-        // 4. Verificar respuesta
+        // 3. Verificar respuesta
         // ------------------------------------------------
+
         if (
             playlistRes.status < 200 ||
             playlistRes.status >= 300
@@ -110,6 +200,45 @@ async function obtenerStreamTelemicro() {
         }
 
 
+        // ------------------------------------------------
+        // 4. Guardar cookies nuevas
+        // ------------------------------------------------
+
+        const nuevasCookies =
+            playlistRes.headers['set-cookie'];
+
+
+        if (
+            nuevasCookies &&
+            nuevasCookies.length > 0
+        ) {
+
+            const cookiesPlaylist =
+                nuevasCookies
+                    .map(cookie =>
+                        cookie.split(';')[0]
+                    )
+                    .join('; ');
+
+
+            if (telemicroCookies) {
+
+                telemicroCookies +=
+                    '; ' +
+                    cookiesPlaylist;
+
+            } else {
+
+                telemicroCookies =
+                    cookiesPlaylist;
+            }
+        }
+
+
+        // ------------------------------------------------
+        // 5. Convertir playlist a texto
+        // ------------------------------------------------
+
         const playlist =
             typeof playlistRes.data === 'string'
                 ? playlistRes.data
@@ -117,14 +246,18 @@ async function obtenerStreamTelemicro() {
 
 
         console.log(
-            'Playlist recibida:',
-            playlist.substring(0, 500)
+            'Playlist recibida:'
+        );
+
+        console.log(
+            playlist.substring(0, 1000)
         );
 
 
         // ------------------------------------------------
-        // 5. Buscar chunks.m3u8
+        // 6. Buscar chunks.m3u8
         // ------------------------------------------------
+
         const match =
             playlist.match(
                 /(?:https?:\/\/[^"\s]+\/)?chunks\.m3u8(?:\?[^"\s]+)?/i
@@ -133,11 +266,35 @@ async function obtenerStreamTelemicro() {
 
         if (match && match[0]) {
 
-            let streamUrl = match[0];
+            let streamUrl =
+                match[0];
 
 
-            // Si la URL viene relativa
-            if (streamUrl.startsWith('/')) {
+            // --------------------------------------------
+            // URL absoluta
+            // --------------------------------------------
+
+            if (
+                streamUrl.startsWith(
+                    'http://'
+                ) ||
+                streamUrl.startsWith(
+                    'https://'
+                )
+            ) {
+
+                // Ya está completa
+
+            }
+
+
+            // --------------------------------------------
+            // URL relativa comenzando /
+            // --------------------------------------------
+
+            else if (
+                streamUrl.startsWith('/')
+            ) {
 
                 streamUrl =
                     'https://live2.telemicro.com.do' +
@@ -145,10 +302,11 @@ async function obtenerStreamTelemicro() {
             }
 
 
-            // Si solamente devuelve chunks.m3u8?...
-            else if (
-                streamUrl.startsWith('chunks.m3u8')
-            ) {
+            // --------------------------------------------
+            // chunks.m3u8?...
+            // --------------------------------------------
+
+            else {
 
                 streamUrl =
                     TELEMICRO_BASE +
@@ -157,9 +315,19 @@ async function obtenerStreamTelemicro() {
 
 
             console.log(
-                'STREAM TELEMICRO ENCONTRADO:',
+                'STREAM TELEMIRO ENCONTRADO:'
+            );
+
+            console.log(
                 streamUrl
             );
+
+
+            ultimoStreamTelemicro =
+                streamUrl;
+
+            ultimaActualizacion =
+                Date.now();
 
 
             return streamUrl;
@@ -167,15 +335,19 @@ async function obtenerStreamTelemicro() {
 
 
         // ------------------------------------------------
-        // 6. Intentar buscar directamente nimblesessionid
+        // 7. Buscar nimblesessionid
         // ------------------------------------------------
+
         const sessionMatch =
             playlist.match(
                 /nimblesessionid[=:%]\s*(\d+)/i
             );
 
 
-        if (sessionMatch && sessionMatch[1]) {
+        if (
+            sessionMatch &&
+            sessionMatch[1]
+        ) {
 
             const sessionId =
                 sessionMatch[1];
@@ -186,9 +358,19 @@ async function obtenerStreamTelemicro() {
 
 
             console.log(
-                'STREAM TELEMICRO POR SESSION ID:',
+                'STREAM TELEMIRO POR SESSION ID:'
+            );
+
+            console.log(
                 streamUrl
             );
+
+
+            ultimoStreamTelemicro =
+                streamUrl;
+
+            ultimaActualizacion =
+                Date.now();
 
 
             return streamUrl;
@@ -196,7 +378,7 @@ async function obtenerStreamTelemicro() {
 
 
         throw new Error(
-            'No se encontró chunks.m3u8 ni nimblesessionid en la playlist'
+            'No se encontró chunks.m3u8 ni nimblesessionid'
         );
 
     }
@@ -204,7 +386,7 @@ async function obtenerStreamTelemicro() {
     catch (error) {
 
         console.error(
-            'Error obteniendo Telemicro:',
+            'ERROR OBTENIENDO TELEMIRO:',
             error.message
         );
 
@@ -215,171 +397,139 @@ async function obtenerStreamTelemicro() {
 
 
 // ======================================================
-// API DE CANALES
+// OBTENER STREAM VÁLIDO
 // ======================================================
-app.get('/api/canales', async (req, res) => {
+
+async function obtenerStreamActual() {
+
+    // --------------------------------------------------
+    // Si ya tenemos uno reciente, intentamos reutilizarlo
+    // durante unos segundos.
+    // --------------------------------------------------
+
+    const ahora =
+        Date.now();
+
+
+    const edad =
+        ahora -
+        ultimaActualizacion;
+
+
+    if (
+        ultimoStreamTelemicro &&
+        edad < 30000
+    ) {
+
+        return ultimoStreamTelemicro;
+    }
+
+
+    // --------------------------------------------------
+    // Buscar uno nuevo
+    // --------------------------------------------------
+
+    return await obtenerStreamTelemicro();
+}
+
+
+
+// ======================================================
+// VERIFICAR QUE UNA URL PERTENEZCA A TELEMIRO
+// ======================================================
+
+function esUrlTelemicro(url) {
 
     try {
 
-        // ------------------------------------------------
-        // Descargar channels.json desde GitHub
-        // ------------------------------------------------
-        const response =
-            await axios.get(
-                GITHUB_JSON_URL,
-                {
-                    headers: {
-                        'User-Agent':
-                            'Mozilla/5.0'
-                    },
-
-                    timeout: 10000
-                }
-            );
+        const parsed =
+            new URL(url);
 
 
-        let canales =
-            typeof response.data === 'string'
-                ? JSON.parse(response.data)
-                : response.data;
-
-
-        // ------------------------------------------------
-        // Fecha actual
-        // ------------------------------------------------
-        const hoy =
-            new Date()
-                .toISOString()
-                .split('T')[0];
-
-
-        // ------------------------------------------------
-        // Filtrar canales vigentes
-        // ------------------------------------------------
-        const vigentes =
-            canales.filter(
-                canal =>
-                    !canal.vencimiento ||
-                    canal.vencimiento >= hoy
-            );
-
-
-        // ------------------------------------------------
-        // Procesar canales
-        // ------------------------------------------------
-        const resultados =
-            await Promise.all(
-
-                vigentes.map(
-                    async canal => {
-
-                        const c = {
-                            ...canal
-                        };
-
-
-                        // ==================================
-                        // TELEMICRO
-                        // ==================================
-                        if (c.telemicro_web) {
-
-                            console.log(
-                                'Buscando nueva sesión de Telemicro...'
-                            );
-
-
-                            const nuevaUrl =
-                                await obtenerStreamTelemicro();
-
-
-                            if (nuevaUrl) {
-
-                                c.url =
-                                    nuevaUrl;
-
-                            } else {
-
-                                // No mandamos una URL vieja.
-                                // Dejamos el canal sin URL
-                                // para que Roku pueda reintentar.
-                                c.url = '';
-                            }
-                        }
-
-
-                        return c;
-                    }
-                )
-            );
-
-
-        // ------------------------------------------------
-        // Respuesta
-        // ------------------------------------------------
-        res.json(resultados);
+        return (
+            parsed.hostname ===
+                'live2.telemicro.com.do'
+        );
 
     }
 
-    catch (error) {
+    catch {
 
-        console.error(
-            'Error general en backend:',
-            error.message
-        );
-
-
-        res.status(500).json(
-            {
-                error:
-                    'Error al procesar la lista de canales'
-            }
-        );
+        return false;
     }
-});
+}
 
 
 
 // ======================================================
-// PRUEBA DIRECTA DE TELEMIICRO
+// CONVERTIR URL RELATIVA EN ABSOLUTA
 // ======================================================
-app.get('/api/telemicro', async (req, res) => {
 
-    const url =
-        await obtenerStreamTelemicro();
+function convertirUrlAbsoluta(
+    url,
+    baseUrl
+) {
 
+    try {
 
-    if (!url) {
+        return new URL(
+            url,
+            baseUrl
+        ).toString();
 
-        return res.status(503).json(
-            {
-                ok: false,
-                error:
-                    'No se pudo obtener el stream de Telemicro'
-            }
-        );
     }
 
+    catch {
 
-    res.json(
-        {
-            ok: true,
-            url: url
-        }
+        return null;
+    }
+}
+
+
+
+// ======================================================
+// CREAR URL DEL PROXY
+// ======================================================
+
+function crearUrlProxy(url) {
+
+    return (
+        '/api/telemicro/proxy?url=' +
+        encodeURIComponent(url)
     );
-});
+}
 
 
 
 // ======================================================
-// INICIAR SERVIDOR
+// REESCRIBIR PLAYLIST HLS
 // ======================================================
-app.listen(
-    PORT,
-    () => {
 
-        console.log(
-            `Servidor activo en el puerto ${PORT}`
-        );
+function reescribirPlaylist(
+    playlist,
+    baseUrl
+) {
 
-    }
-);
+    let resultado =
+        playlist;
+
+
+    // --------------------------------------------------
+    // Reescribir URI="..."
+    //
+    // Sirve para:
+    // EXT-X-KEY
+    // EXT-X-MAP
+    // EXT-X-MEDIA
+    // etc.
+    // --------------------------------------------------
+
+    resultado =
+        resultado.replace(
+            /URI="([^"]+)"/gi,
+            (match, uri) => {
+
+                const absoluta =
+                    convertirUrlAbsoluta(
+                        uri,
+```
