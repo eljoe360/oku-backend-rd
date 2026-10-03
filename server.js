@@ -46,7 +46,11 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 /* CONFIGURACIÓN DE URLS DE CANALES */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
-const CANAL7_ANTMEDIA_URL = process.env.CANAL7_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/sitv2000038941.m3u8';
+
+/* CANAL 7 - ANTENA 7 (NUEVA URL CLOUDFRONT) */
+const CANAL7_STREAM_URL = process.env.CANAL7_STREAM_URL || 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
+
+/* CANAL 8 - TELEMEDIOS */
 const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 
 /* CANAL 9 - COLOR VISIÓN (DAILYMOTION) */
@@ -193,7 +197,6 @@ async function extraerStreamDailymotion(videoId) {
         console.error(`[Dailymotion Canal 9 Error] ${videoId}:`, e.message);
     }
 
-    // Fallback al enlace M3U8 directo si la API dinámica falla
     return CANAL9_FALLBACK_URL;
 }
 
@@ -281,7 +284,7 @@ app.get('/api/proxy/segment', async (req, res) => {
 });
 
 /* =========================================================
-   RUTAS DE CANALES
+   RUTAS DE CANALES CON MAPEO ESTRICTO
 ========================================================= */
 app.get('/api/canales', async (req, res) => {
     try {
@@ -290,15 +293,17 @@ app.get('/api/canales', async (req, res) => {
         const baseUrl = obtenerBaseUrl(req);
 
         const resultado = canales.map(canal => {
-            // Evaluaciones estrictas e independientes por propiedad
-            if (canal.canal9_web) return { ...canal, url: `${baseUrl}/api/canal9` };
-            if (canal.canal8_web) return { ...canal, url: `${baseUrl}/api/canal8` };
-            if (canal.telemicro_web) return { ...canal, url: `${baseUrl}/api/telemicro` };
-            if (canal.canal6_web) return { ...canal, url: `${baseUrl}/api/canal6` };
-            if (canal.canal7_web) return { ...canal, url: `${baseUrl}/api/canal7` };
-            if (canal.canal11_web) return { ...canal, url: `${baseUrl}/api/canal11` };
-            if (canal.canal13_web) return { ...canal, url: `${baseUrl}/api/canal13` };
-            return canal;
+            let targetUrl = canal.url;
+
+            if (canal.telemicro_web) targetUrl = `${baseUrl}/api/telemicro`;
+            else if (canal.canal6_web) targetUrl = `${baseUrl}/api/canal6`;
+            else if (canal.canal7_web) targetUrl = `${baseUrl}/api/canal7`;
+            else if (canal.canal8_web) targetUrl = `${baseUrl}/api/canal8`;
+            else if (canal.canal9_web) targetUrl = `${baseUrl}/api/canal9`;
+            else if (canal.canal11_web) targetUrl = `${baseUrl}/api/canal11`;
+            else if (canal.canal13_web) targetUrl = `${baseUrl}/api/canal13`;
+
+            return { ...canal, url: targetUrl };
         });
 
         res.json(resultado);
@@ -315,8 +320,9 @@ app.get('/api/canal6', async (req, res) => {
     await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
 });
 
+/* CANAL 7 - ANTENA 7 (VIA CLOUDFRONT) */
 app.get('/api/canal7', async (req, res) => {
-    await procesarPlaylistProxy(CANAL7_ANTMEDIA_URL, req, res);
+    await procesarPlaylistProxy(CANAL7_STREAM_URL, req, res);
 });
 
 app.get('/api/canal8', async (req, res) => {
