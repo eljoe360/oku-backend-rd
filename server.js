@@ -140,7 +140,7 @@ async function obtenerStreamWindTVO(channelId) {
         const bodyData = new URLSearchParams({ channel_id: channelId }).toString();
         const respuesta = await axios.post(WINDTVO_API_URL, bodyData, {
             httpAgent: agenteHttp,
-            timeout: 8000,
+            timeout: 6000,
             headers: {
                 'Host': 'lb.windtvo.do:88',
                 'User-Agent': USER_AGENT,
@@ -283,7 +283,7 @@ app.get('/api/proxy/segment', async (req, res) => {
 });
 
 /* =========================================================
-   RUTAS DE CANALES CON SUBCANALES
+   RUTAS DE CANALES Y SUBCANALES
 ========================================================= */
 app.get('/api/canales', async (req, res) => {
     try {
@@ -334,17 +334,24 @@ app.get('/api/canal9', async (req, res) => {
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
-/* CANAL 11 PRINCIPAL: TELESISTEMA SEÑAL TV ABIERTA (WINDTVO) */
+/* CANAL 11 PRINCIPAL: CONMUTACIÓN AUTOMÁTICA WINDTVO / DAILYMOTION */
 app.get('/api/canal11', async (req, res) => {
-    const streamUrl = await obtenerStreamWindTVO('11');
-    if (!streamUrl) return res.status(503).send('Sin señal Canal 11 TV');
-    await procesarPlaylistProxy(streamUrl, req, res, 'http://lb.windtvo.do:88/');
+    let streamUrl = await obtenerStreamWindTVO('11');
+    let referer = 'http://lb.windtvo.do:88/';
+
+    if (!streamUrl) {
+        streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_FALLBACK_URL);
+        referer = 'https://www.dailymotion.com/';
+    }
+
+    if (!streamUrl) return res.status(503).send('Sin señal Canal 11');
+    await procesarPlaylistProxy(streamUrl, req, res, referer);
 });
 
-/* CANAL 11.1 SEGUNDARIO: TELESISTEMA SEÑAL WEB (DAILYMOTION) */
+/* CANAL 11.1 SEGUNDARIO: SEÑAL DAILYMOTION EXCLUSIVA */
 app.get('/api/canal11-dm', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_FALLBACK_URL);
-    if (!streamUrl) return res.status(503).send('Sin señal Canal 11 Web');
+    if (!streamUrl) return res.status(503).send('Sin señal Canal 11.1');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
