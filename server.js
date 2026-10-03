@@ -5,13 +5,13 @@ const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Agente HTTPS para bypass de restricciones TLS
+// Agente HTTPS para omitir restricciones SSL/TLS estrictas en CloudFront o servidores antiguos
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
     keepAlive: true
 });
 
-// Habilitar cabeceras CORS globales para evitar bloqueos en Roku
+// Habilitar cabeceras CORS globales para permitir conexiones desde dispositivos Roku
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -64,7 +64,7 @@ app.get('/api/canales', async (req, res) => {
 });
 
 // ======================================================
-// TELEMICRO
+// TELEMICRO (CANAL 5)
 // ======================================================
 const TELEMICRO_PLAYLIST = 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const TELEMICRO_BASE = 'https://live2.telemicro.com.do/live/55/';
@@ -261,12 +261,13 @@ app.get('/api/canal6', async (req, res) => {
 });
 
 // ======================================================
-// CANAL 7 (ANTENA 7)
+// CANAL 7 (ANTENA 7 / CLOUDFRONT)
 // ======================================================
 const CANAL7_MASTER = 'https://d3gie3ig6argu.cloudfront.net/ts:abr.m3u8';
 const CANAL7_BASE = 'https://d3gie3ig6argu.cloudfront.net/';
 
 async function obtenerPlaylistCanal7() {
+    // 1. Obtener Master Playlist de CloudFront
     const masterRes = await axios.get(CANAL7_MASTER, {
         httpsAgent: httpsAgent,
         headers: {
@@ -281,6 +282,7 @@ async function obtenerPlaylistCanal7() {
     const masterLines = masterRes.data.split(/\r?\n/);
     let subPlaylistUrl = null;
 
+    // Buscar la sub-playlist interna dentro del archivo master
     for (const line of masterLines) {
         const trimmed = line.trim();
         if (trimmed && !trimmed.startsWith('#')) {
@@ -289,9 +291,10 @@ async function obtenerPlaylistCanal7() {
         }
     }
 
-    if (!subPlaylistUrl) subPlaylistUrl = CANAL7_MASTER;
+    const targetUrl = subPlaylistUrl || CANAL7_MASTER;
 
-    const subRes = await axios.get(subPlaylistUrl, {
+    // 2. Obtener la sub-playlist que contiene los segmentos .ts
+    const subRes = await axios.get(targetUrl, {
         httpsAgent: httpsAgent,
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -305,12 +308,13 @@ async function obtenerPlaylistCanal7() {
     const lineas = subRes.data.split(/\r?\n/);
     const resultado = [];
 
+    // 3. Convertir cada URL de segmento .ts hacia el proxy local
     for (const linea of lineas) {
         const texto = linea.trim();
         if (!texto) { resultado.push(''); continue; }
         if (texto.startsWith('#')) { resultado.push(texto); continue; }
 
-        const urlSegmento = new URL(texto, subPlaylistUrl).href;
+        const urlSegmento = new URL(texto, targetUrl).href;
         resultado.push('/api/canal7/proxy?url=' + encodeURIComponent(urlSegmento));
     }
 
@@ -338,6 +342,7 @@ app.get('/api/canal7/proxy', async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache');
         return res.send(response.data);
     } catch (error) {
+        console.log('Error proxy Canal 7:', error.message);
         return res.status(502).send('Error segmento Canal 7');
     }
 });
@@ -349,6 +354,7 @@ app.get('/api/canal7', async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         return res.send(playlist);
     } catch (error) {
+        console.log('Error Canal 7:', error.message);
         return res.status(502).send('Error Canal 7');
     }
 });
