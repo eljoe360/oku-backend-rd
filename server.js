@@ -54,6 +54,7 @@ const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabie
 const CANAL13_STREAM_URL = process.env.CANAL13_STREAM_URL || 'https://live2.telemicro.com.do/live/telecentrocast_1080p/chunks.m3u8';
 const CANAL15_STREAM_URL = process.env.CANAL15_STREAM_URL || 'https://live4.telemicro.com.do/live/digital15cast_1080p/chunks.m3u8';
 const CANAL18_STREAM_URL = process.env.CANAL18_STREAM_URL || 'https://ss2.tvrdomi.com:1936/ame47/ame47/playlist.m3u8';
+const CANAL19_STREAM_URL = process.env.CANAL19_STREAM_URL || 'https://5790d294af2dc.streamlock.net/tvhdlive/tvhdlive/playlist.m3u8';
 
 /* =========================================================
    IDENTIFICADORES DAILYMOTION (EXTRACCIÓN DINÁMICA 100% ACTIVA)
@@ -299,6 +300,7 @@ app.get('/api/canales', async (req, res) => {
             else if (canal.canal13_web) targetUrl = `${baseUrl}/api/canal13`;
             else if (canal.canal15_web) targetUrl = `${baseUrl}/api/canal15`;
             else if (canal.canal18_web) targetUrl = `${baseUrl}/api/canal18`;
+            else if (canal.canal19_web) targetUrl = `${baseUrl}/api/canal19`;
 
             return { ...canal, url: targetUrl };
         });
@@ -357,6 +359,10 @@ app.get('/api/canal15', async (req, res) => {
 
 app.get('/api/canal18', async (req, res) => {
     await procesarPlaylistProxy(CANAL18_STREAM_URL, req, res);
+});
+
+app.get('/api/canal19', async (req, res) => {
+    await procesarPlaylistProxy(CANAL19_STREAM_URL, req, res);
 });
 
 app.get('/', (req, res) => res.send('ROKU Backend RD OK'));
