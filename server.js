@@ -48,6 +48,7 @@ const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.tele
 const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
 const CANAL7_STREAM_URL = process.env.CANAL7_STREAM_URL || 'https://hls.tvabierta.net/hls/007.m3u8';
 const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
+const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabierta.net/hls/010.m3u8';
 
 /* DAILYMOTION CANAL 9 */
 const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
@@ -270,6 +271,7 @@ app.get('/api/canales', async (req, res) => {
             else if (canal.canal7_web) targetUrl = `${baseUrl}/api/canal7`;
             else if (canal.canal8_web) targetUrl = `${baseUrl}/api/canal8`;
             else if (canal.canal9_web) targetUrl = `${baseUrl}/api/canal9`;
+            else if (canal.canal10_web) targetUrl = `${baseUrl}/api/canal10`;
             else if (canal.canal11_web) targetUrl = `${baseUrl}/api/canal11`;
 
             return { ...canal, url: targetUrl };
@@ -303,7 +305,10 @@ app.get('/api/canal9', async (req, res) => {
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
-/* CANAL 11 PRINCIPAL */
+app.get('/api/canal10', async (req, res) => {
+    await procesarPlaylistProxy(CANAL10_STREAM_URL, req, res);
+});
+
 app.get('/api/canal11', async (req, res) => {
     let streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_MASTER_URL);
     if (!streamUrl) streamUrl = CANAL11_MASTER_URL;
