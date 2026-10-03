@@ -21,7 +21,7 @@ if (!SECRET) {
     console.warn('[AVISO] PROXY_SECRET no definido. Se generó uno temporal.');
 }
 
-const INSECURE_TLS_HOSTS = (process.env.INSECURE_TLS_HOSTS || 'live2.telemicro.com.do')
+const INSECURE_TLS_HOSTS = (process.env.INSECURE_TLS_HOSTS || 'live2.telemicro.com.do,live4.telemicro.com.do')
     .split(',')
     .map(h => h.trim().toLowerCase())
     .filter(Boolean);
@@ -52,6 +52,7 @@ const CANAL7_STREAM_URL  = process.env.CANAL7_STREAM_URL  || 'https://hls.tvabie
 const CANAL8_STREAM_URL  = process.env.CANAL8_STREAM_URL  || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabierta.net/hls/010.m3u8';
 const CANAL13_STREAM_URL = process.env.CANAL13_STREAM_URL || 'https://live2.telemicro.com.do/live/telecentrocast_1080p/chunks.m3u8';
+const CANAL15_STREAM_URL = process.env.CANAL15_STREAM_URL || 'https://live4.telemicro.com.do/live/digital15cast_1080p/chunks.m3u8';
 
 /* =========================================================
    IDENTIFICADORES DAILYMOTION (EXTRACCIÓN DINÁMICA 100% ACTIVA)
@@ -295,6 +296,7 @@ app.get('/api/canales', async (req, res) => {
             else if (canal.canal11_web) targetUrl = `${baseUrl}/api/canal11`;
             else if (canal.canal12_web) targetUrl = `${baseUrl}/api/canal12`;
             else if (canal.canal13_web) targetUrl = `${baseUrl}/api/canal13`;
+            else if (canal.canal15_web) targetUrl = `${baseUrl}/api/canal15`;
 
             return { ...canal, url: targetUrl };
         });
@@ -345,6 +347,10 @@ app.get('/api/canal12', async (req, res) => {
 
 app.get('/api/canal13', async (req, res) => {
     await procesarPlaylistProxy(CANAL13_STREAM_URL, req, res, 'https://telemicro.com.do/');
+});
+
+app.get('/api/canal15', async (req, res) => {
+    await procesarPlaylistProxy(CANAL15_STREAM_URL, req, res, 'https://telemicro.com.do/');
 });
 
 app.get('/', (req, res) => res.send('ROKU Backend RD OK'));
