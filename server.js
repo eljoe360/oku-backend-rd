@@ -46,18 +46,17 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 /* CONFIGURACIÓN DE URLS DE CANALES */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
-
-/* CANAL 7 - ANTENA 7 (SEÑAL TV ABIERTA ESTABLE) */
 const CANAL7_STREAM_URL = process.env.CANAL7_STREAM_URL || 'https://hls.tvabierta.net/hls/007.m3u8';
-
-/* CANAL 8 - TELEMEDIOS */
 const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 
-/* CANAL 9 - COLOR VISIÓN (DAILYMOTION) */
+/* DAILYMOTION: CANAL 9 (COLOR VISIÓN) Y CANAL 11 (TELESISTEMA) */
 const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
-const CANAL9_FALLBACK_URL = 'https://live.eu-north-1a.cf.dmcdn.net/sec2(KLqkM_kGjzvssE3oSBAg843Zt3GQcvNHH3se76sPlBHe00GQi686UcQlwa12qp-_wueAIi8_yN4NIIBUvESn5PQn6yUmxMs3f63VZ57dJYM3GHLghyK_7I75nZn13lcY)/dm/3/x7gy059/d/live-480.m3u8?startdate=2026-09-03T23%3A24%3A16%2B0000';
+const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
 
-/* WINDTVO API */
+const CANAL9_FALLBACK_URL = 'https://live.eu-north-1a.cf.dmcdn.net/sec2(KLqkM_kGjzvssE3oSBAg843Zt3GQcvNHH3se76sPlBHe00GQi686UcQlwa12qp-_wueAIi8_yN4NIIBUvESn5PQn6yUmxMs3f63VZ57dJYM3GHLghyK_7I75nZn13lcY)/dm/3/x7gy059/d/live-480.m3u8?startdate=2026-09-03T23%3A24%3A16%2B0000';
+const CANAL11_FALLBACK_URL = 'https://live2.eu-north-1b.cf.dmcdn.net/sec2(BC2EhsEpta4dqDBBPYVP5vHPT2FerfUkqAyav3OyZKVjhliiI-jWH6YoRCYufyux0CbFw0zCUnEOaA8E1dS3F9arAGEOS0oIXRwZtMeOk2iEo-y-UtvmAgKzRdfjsRXK)/cloud/3/x80ac48/d/live-480.m3u8';
+
+/* WINDTVO API (CANAL 13) */
 const WINDTVO_API_URL = 'http://198.244.227.59:88/ttl_api_channel.php';
 
 app.use((req, res, next) => {
@@ -134,7 +133,7 @@ function validarParametrosProxy(req, res) {
 }
 
 /* =========================================================
-   EXTRACTOR WINDTVO (CANALES 11 Y 13)
+   EXTRACTOR WINDTVO (CANAL 13)
 ========================================================= */
 async function obtenerStreamWindTVO(channelId) {
     try {
@@ -161,14 +160,14 @@ async function obtenerStreamWindTVO(channelId) {
 }
 
 /* =========================================================
-   EXTRACTOR DAILYMOTION (CANAL 9 EXCLUSIVO)
+   EXTRACTOR MULTI-DAILYMOTION (CANAL 9 Y CANAL 11)
 ========================================================= */
 const DM_CACHE_MS = 15 * 1000;
 const dmCache = new Map();
 
-async function extraerStreamDailymotion(videoId) {
+async function extraerStreamDailymotion(videoId, fallbackUrl) {
     const ahora = Date.now();
-    const cacheKey = `dm_canal9_${videoId}`;
+    const cacheKey = `dm_${videoId}`;
     const cached = dmCache.get(cacheKey);
     if (cached && cached.expira > ahora) return cached.url;
 
@@ -194,10 +193,10 @@ async function extraerStreamDailymotion(videoId) {
             }
         }
     } catch (e) {
-        console.error(`[Dailymotion Canal 9 Error] ${videoId}:`, e.message);
+        console.error(`[Dailymotion Error] ${videoId}:`, e.message);
     }
 
-    return CANAL9_FALLBACK_URL;
+    return fallbackUrl;
 }
 
 /* =========================================================
@@ -320,7 +319,6 @@ app.get('/api/canal6', async (req, res) => {
     await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
 });
 
-/* CANAL 7 - ANTENA 7 (TV ABIERTA HLS) */
 app.get('/api/canal7', async (req, res) => {
     await procesarPlaylistProxy(CANAL7_STREAM_URL, req, res);
 });
@@ -329,16 +327,18 @@ app.get('/api/canal8', async (req, res) => {
     await procesarPlaylistProxy(CANAL8_STREAM_URL, req, res);
 });
 
+/* CANAL 9 - COLOR VISIÓN */
 app.get('/api/canal9', async (req, res) => {
-    const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
+    const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID, CANAL9_FALLBACK_URL);
     if (!streamUrl) return res.status(503).send('Sin señal Canal 9');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
+/* CANAL 11 - TELESISTEMA (DAILYMOTION DINO) */
 app.get('/api/canal11', async (req, res) => {
-    const streamUrl = await obtenerStreamWindTVO('11');
+    const streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_FALLBACK_URL);
     if (!streamUrl) return res.status(503).send('Sin señal Canal 11');
-    await procesarPlaylistProxy(streamUrl, req, res, 'http://lb.windtvo.do:88/');
+    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
 app.get('/api/canal13', async (req, res) => {
