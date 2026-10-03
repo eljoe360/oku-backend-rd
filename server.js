@@ -282,34 +282,62 @@ app.get('/api/canal6', async (req, res) => {
 });
 
 // ======================================================
-// CANAL 7 (ANTENA 7 / CLOUDFRONT)
+// CANAL 7 (ANTENA 7 / CLOUDFRONT) - SOLUCIÓN PARA ROKU
 // ======================================================
 const CANAL7_MASTER = 'https://d3gie3ig6argu.cloudfront.net/ts:abr.m3u8';
 const CANAL7_BASE = 'https://d3gie3ig6argu.cloudfront.net/';
 
 app.get('/api/canal7', async (req, res) => {
     try {
-        console.log('Roku solicitó Antena 7...');
+        console.log('Obteniendo master playlist de Antena 7...');
 
-        const response = await axios.get(CANAL7_MASTER, {
+        // 1. Obtener la playlist Master
+        const masterRes = await axios.get(CANAL7_MASTER, {
             httpsAgent: httpsAgent,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Accept': 'application/x-mpegURL, application/vnd.apple.mpegurl, */*',
-                'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+                'Accept': '*/*',
                 'Origin': 'https://www.antena7.com.do',
-                'Referer': 'https://www.antena7.com.do/',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'cross-site'
+                'Referer': 'https://www.antena7.com.do/'
             },
             timeout: 15000
         });
 
-        const playlist = response.data;
+        const masterLines = masterRes.data.split(/\r?\n/);
+        let subPlaylistUrl = null;
+
+        // 2. Extraer la URL de la variante de video activa
+        for (const line of masterLines) {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#')) {
+                subPlaylistUrl = new URL(trimmed, CANAL7_BASE).href;
+                break;
+            }
+        }
+
+        if (!subPlaylistUrl) {
+            subPlaylistUrl = CANAL7_MASTER;
+        }
+
+        console.log('Cargando sub-playlist de Canal 7:', subPlaylistUrl);
+
+        // 3. Obtener la sub-playlist con los segmentos .ts reales
+        const subRes = await axios.get(subPlaylistUrl, {
+            httpsAgent: httpsAgent,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Origin': 'https://www.antena7.com.do',
+                'Referer': 'https://www.antena7.com.do/'
+            },
+            timeout: 15000
+        });
+
+        const playlist = subRes.data;
         const lineas = playlist.split(/\r?\n/);
         const resultado = [];
 
+        // 4. Convertir cada segmento a URL absoluta directa de CloudFront
         for (const linea of lineas) {
             const texto = linea.trim();
 
@@ -323,7 +351,7 @@ app.get('/api/canal7', async (req, res) => {
                 continue;
             }
 
-            const urlAbsoluta = new URL(texto, CANAL7_BASE).href;
+            const urlAbsoluta = new URL(texto, subPlaylistUrl).href;
             resultado.push(urlAbsoluta);
         }
 
@@ -358,7 +386,6 @@ app.get('/api/canales', async (req, res) => {
         const resultado = canalesValidos.map(canal => {
             const nuevo = { ...canal };
 
-            // Reemplazo dinámico según las etiquetas del JSON de GitHub
             if (canal.telemicro_web) {
                 nuevo.url = `${baseUrl}/api/telemicro`;
             } else if (canal.canal6_web) {
