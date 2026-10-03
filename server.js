@@ -46,9 +46,17 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 /* CONFIGURACIÓN DE URLS DE CANALES */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
-const CANAL7_ANTMEDIA_URL = process.env.CANAL7_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/sitv2000038941.ts';
+
+/* CANAL 7 - ANTENA 7 (SITV / ANTMEDIA) */
+const CANAL7_ANTMEDIA_URL = process.env.CANAL7_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/sitv2000038941.m3u8';
+
+/* CANAL 8 - TELEMEDIOS */
 const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
+
+/* CANAL 9 - COLOR VISIÓN (DAILYMOTION INDEPENDIENTE) */
 const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
+
+/* WINDTVO API */
 const WINDTVO_API_URL = 'http://198.244.227.59:88/ttl_api_channel.php';
 
 app.use((req, res, next) => {
@@ -152,7 +160,7 @@ async function obtenerStreamWindTVO(channelId) {
 }
 
 /* =========================================================
-   EXTRACTOR DAILYMOTION (CANAL 9)
+   EXTRACTOR DAILYMOTION (CANAL 9 EXCLUSIVO)
 ========================================================= */
 const DM_CACHE_MS = 20 * 1000;
 const dmCache = new Map();
@@ -306,33 +314,17 @@ app.get('/api/canal6', async (req, res) => {
     await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
 });
 
+/* CANAL 7 - ANTENA 7 (PROXY M3U8) */
 app.get('/api/canal7', async (req, res) => {
-    try {
-        const respuesta = await axios.get(CANAL7_ANTMEDIA_URL, {
-            httpAgent: agenteHttp,
-            timeout: 12000,
-            responseType: 'stream',
-            headers: { 'User-Agent': USER_AGENT }
-        });
-
-        res.setHeader('Content-Type', 'video/mp2t');
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        respuesta.data.pipe(res);
-
-        respuesta.data.on('error', (err) => {
-            console.error('[Canal 7 Stream Error]:', err.message);
-            if (!res.headersSent) res.status(502).send('Error de señal');
-        });
-    } catch (error) {
-        console.error('[Canal 7 Connection Error]:', error.message);
-        res.status(503).send('Sin señal Canal 7');
-    }
+    await procesarPlaylistProxy(CANAL7_ANTMEDIA_URL, req, res);
 });
 
+/* CANAL 8 - TELEMEDIOS */
 app.get('/api/canal8', async (req, res) => {
     await procesarPlaylistProxy(CANAL8_STREAM_URL, req, res);
 });
 
+/* CANAL 9 - COLOR VISIÓN */
 app.get('/api/canal9', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
     if (!streamUrl) return res.status(503).send('Sin señal Canal 9');
