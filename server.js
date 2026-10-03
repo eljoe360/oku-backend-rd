@@ -21,11 +21,10 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 /* CONFIGURACIÓN DE CANALES */
 const TELEMICRO_PLAYLIST = 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
-const TELEMICRO_BASE = 'https://live2.telemicro.com.do/live/55/';
 const CANAL6_STREAM_URL = 'https://stream.elseis.do/canal6/master.m3u8';
 
-// IDs actualizados de Dailymotion para Canal 7 y Canal 8
-const CANAL7_VIDEO_ID = 'x9hvyy0'; 
+// IDs de Dailymotion para Canal 7 (Antena 7) y Canal 8 (Color Visión / CDN Dailymotion)
+const CANAL7_VIDEO_ID = 'x9hvyy0';
 const CANAL8_VIDEO_ID = 'x9hvyy0';
 
 function obtenerBaseUrl(req) {
@@ -35,14 +34,15 @@ function obtenerBaseUrl(req) {
 }
 
 /* =========================================================
-   EXTRACTOR DE DAILYMOTION (CANAL 7 Y 8)
+   EXTRACTOR ROBUSATO DE DAILYMOTION (CANAL 7 Y 8)
 ========================================================= */
 async function obtenerStreamDailymotionFresco(videoId) {
+    // Método 1: API de Player Metadata
     try {
         const metadataUrl = `https://www.dailymotion.com/player/metadata/video/${videoId}`;
         const respuesta = await axios.get(metadataUrl, {
             httpsAgent,
-            timeout: 8000,
+            timeout: 6000,
             headers: {
                 'User-Agent': USER_AGENT,
                 'Referer': `https://www.dailymotion.com/embed/video/${videoId}`
@@ -56,12 +56,33 @@ async function obtenerStreamDailymotionFresco(videoId) {
             if (videoStream?.url) return videoStream.url;
         }
     } catch (e) {
-        console.error(`Error extrayendo Dailymotion (${videoId}):`, e.message);
+        console.error(`[Dailymotion API] Error en ${videoId}:`, e.message);
     }
+
+    // Método 2: Extracción CDN de respaldo vía Embed
+    try {
+        const embedUrl = `https://www.dailymotion.com/embed/video/${videoId}`;
+        const res = await axios.get(embedUrl, {
+            httpsAgent,
+            timeout: 6000,
+            headers: { 'User-Agent': USER_AGENT }
+        });
+
+        const match = res.data.match(/https%3A%2F%2F[^\s"']+\.m3u8[^\s"']*/);
+        if (match) {
+            const decodedUrl = decodeURIComponent(match[0]);
+            return decodedUrl;
+        }
+    } catch (e) {
+        console.error(`[Dailymotion Scraping] Error en ${videoId}:`, e.message);
+    }
+
     return null;
 }
 
-/* Manejador unificado de subplaylists/listas idéntico a la estructura funcional de Canal 6 */
+/* =========================================================
+   PROXIES Y PROCESADORES HLS
+========================================================= */
 async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
     try {
         const headers = { 'User-Agent': USER_AGENT };
@@ -98,9 +119,6 @@ async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
     }
 }
 
-/* =========================================================
-   ENDPOINTS PROXY COMPARTIDOS (Mismo motor que Canal 6)
-========================================================= */
 app.get('/api/proxy/subplaylist', async (req, res) => {
     const { url, ref } = req.query;
     if (!url) return res.status(400).send('Falta URL');
@@ -166,7 +184,8 @@ app.get('/api/telemicro', async (req, res) => {
 app.get('/api/canal7', async (req, res) => {
     const streamUrl = await obtenerStreamDailymotionFresco(CANAL7_VIDEO_ID);
     if (!streamUrl) return res.status(503).send('Sin señal Canal 7');
-    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
+    // Redirección directa para preservar tokens de sesión dinámicos de Dailymotion
+    res.redirect(302, streamUrl);
 });
 
 /* =========================================================
@@ -175,7 +194,8 @@ app.get('/api/canal7', async (req, res) => {
 app.get('/api/canal8', async (req, res) => {
     const streamUrl = await obtenerStreamDailymotionFresco(CANAL8_VIDEO_ID);
     if (!streamUrl) return res.status(503).send('Sin señal Canal 8');
-    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
+    // Redirección directa para preservar tokens de sesión dinámicos de Dailymotion
+    res.redirect(302, streamUrl);
 });
 
 /* =========================================================
