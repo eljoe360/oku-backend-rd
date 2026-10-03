@@ -7,10 +7,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 /* =========================================================
-   CONFIGURACIÓN Y MIDDLEWARES
+   CONFIGURACIÓN
 ========================================================= */
-
-// Trust proxy dinámico para Render, Railway, Vercel, etc.
 app.set('trust proxy', true);
 app.disable('x-powered-by');
 
@@ -42,10 +40,12 @@ function agenteParaUrl(urlStr) {
 const CANALES_JSON = process.env.CANALES_JSON || 'https://raw.githubusercontent.com/eljoe360/channels.roku/main/channels.json';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
+/* CONFIGURACIÓN DE CANALES */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
-const CANAL7_STREAM_URL = process.env.CANAL7_STREAM_URL || 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
-const CANAL8_VIDEO_ID = process.env.CANAL8_VIDEO_ID || 'x9hvyy0';
+
+/* CANAL 9 - COLOR VISIÓN (DAILYMOTION) */
+const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -121,9 +121,9 @@ function validarParametrosProxy(req, res) {
 }
 
 /* =========================================================
-   EXTRACTOR DE DAILYMOTION (CORREGIDO)
+   EXTRACTOR DINÁMICO DE DAILYMOTION (CANAL 9)
 ========================================================= */
-const DM_CACHE_MS = 25 * 1000;
+const DM_CACHE_MS = 20 * 1000; // Caché corta para evitar URLs caducadas
 const dmCache = new Map();
 
 async function extraerStreamDailymotion(videoId) {
@@ -250,8 +250,7 @@ app.get('/api/canales', async (req, res) => {
         const resultado = canales.map(canal => {
             if (canal.telemicro_web) return { ...canal, url: `${baseUrl}/api/telemicro` };
             if (canal.canal6_web) return { ...canal, url: `${baseUrl}/api/canal6` };
-            if (canal.canal7_web) return { ...canal, url: `${baseUrl}/api/canal7` };
-            if (canal.canal8_web) return { ...canal, url: `${baseUrl}/api/canal8` };
+            if (canal.canal9_web) return { ...canal, url: `${baseUrl}/api/canal9` };
             return canal;
         });
 
@@ -269,13 +268,9 @@ app.get('/api/canal6', async (req, res) => {
     await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
 });
 
-app.get('/api/canal7', async (req, res) => {
-    await procesarPlaylistProxy(CANAL7_STREAM_URL, req, res);
-});
-
-app.get('/api/canal8', async (req, res) => {
-    const streamUrl = await extraerStreamDailymotion(CANAL8_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Sin señal Canal 8');
+app.get('/api/canal9', async (req, res) => {
+    const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
+    if (!streamUrl) return res.status(503).send('Sin señal Canal 9');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
