@@ -16,30 +16,17 @@ app.use((req, res, next) => {
     next();
 });
 
-/* =========================================================
-   CONFIGURACIÓN DE CANALES
-========================================================= */
+const CANALES_JSON = 'https://raw.githubusercontent.com/eljoe360/channels.roku/main/channels.json';
 
-const CANALES_JSON =
-    'https://raw.githubusercontent.com/eljoe360/channels.roku/main/channels.json';
-
-/* ---------- CANAL 5 ---------- */
+/* CONFIGURACIÓN DE CANALES */
 const TELEMICRO_PLAYLIST = 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const TELEMICRO_BASE = 'https://live2.telemicro.com.do/live/55/';
-
-/* ---------- CANAL 6 ---------- */
 const CANAL6_STREAM_URL = 'https://stream.elseis.do/canal6/master.m3u8';
 
-/* ---------- CANAL 7 ---------- */
 const CANAL7_VIDEO_ID = 'x9hvyy0';
-
-/* ---------- CANAL 8 ---------- */
 const CANAL8_VIDEO_ID = 'x9hvyy0';
 
-
-/* =========================================================
-   FUNCIONES GENERALES
-========================================================= */
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 function obtenerBaseUrl(req) {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
@@ -47,35 +34,57 @@ function obtenerBaseUrl(req) {
     return `${protocol}://${host}`;
 }
 
+/* Extractor Robusto de Dailymotion */
 async function obtenerUrlDailymotion(videoId) {
     try {
+        // Intento 1: API Metadata con User-Agent de navegador
         const metadataUrl = `https://www.dailymotion.com/player/metadata/video/${videoId}`;
-        const respuesta = await axios.get(metadataUrl, {
+        const respMeta = await axios.get(metadataUrl, {
             httpsAgent,
             timeout: 10000,
             headers: {
-                'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-                'Referer': 'https://www.dailymotion.com/'
+                'User-Agent': USER_AGENT,
+                'Referer': `https://www.dailymotion.com/embed/video/${videoId}`,
+                'Accept-Language': 'es-ES,es;q=0.9'
             }
         });
 
-        if (respuesta.data && respuesta.data.qualities) {
-            const qualities = respuesta.data.qualities;
-            const autoQuality = qualities.auto || Object.values(qualities)[0];
-            if (autoQuality && autoQuality[0] && autoQuality[0].url) {
-                return autoQuality[0].url;
-            }
+        if (respMeta.data && respMeta.data.qualities) {
+            const qualities = respMeta.data.qualities;
+            // Preferir auto, si no buscar la primera cualidad de video válida
+            const autoList = qualities.auto || Object.values(qualities).flat();
+            const streamObj = autoList.find(q => q.url && !q.url.includes('live-aac'));
+            if (streamObj) return streamObj.url;
+            if (autoList[0]?.url) return autoList[0].url;
         }
-    } catch (error) {
-        console.error(`Error obteniendo metadata Dailymotion (${videoId}):`, error.message);
+    } catch (e) {
+        console.error(`Error metadatos Dailymotion (${videoId}):`, e.message);
     }
+
+    try {
+        // Intento 2: Búsqueda directa en la página de embed
+        const embedUrl = `https://www.dailymotion.com/embed/video/${videoId}`;
+        const respEmbed = await axios.get(embedUrl, {
+            httpsAgent,
+            timeout: 10000,
+            headers: { 'User-Agent': USER_AGENT }
+        });
+
+        const match = respEmbed.data.match(/"qualities":\s*({.*?}),"type"/);
+        if (match && match[1]) {
+            const parsed = JSON.parse(match[1]);
+            const autoList = parsed.auto || Object.values(parsed).flat();
+            if (autoList[0]?.url) return autoList[0].url;
+        }
+    } catch (e) {
+        console.error(`Error fallback embed Dailymotion (${videoId}):`, e.message);
+    }
+
     return null;
 }
 
-
 /* =========================================================
-   LISTA PRINCIPAL DE CANALES (/api/canales)
+   LISTA DE CANALES (/api/canales)
 ========================================================= */
 
 app.get('/api/canales', async (req, res) => {
@@ -85,105 +94,52 @@ app.get('/api/canales', async (req, res) => {
         const baseUrl = obtenerBaseUrl(req);
 
         const resultado = canales.map(canal => {
-            if (canal.telemicro_web === true) {
-                return { ...canal, url: `${baseUrl}/api/telemicro` };
-            }
-            if (canal.canal6_web === true) {
-                return { ...canal, url: `${baseUrl}/api/canal6` };
-            }
-            if (canal.canal7_web === true) {
-                return { ...canal, url: `${baseUrl}/api/canal7` };
-            }
-            if (canal.canal8_web === true) {
-                return { ...canal, url: `${baseUrl}/api/canal8` };
-            }
+            if (canal.telemicro_web === true) return { ...canal, url: `${baseUrl}/api/telemicro` };
+            if (canal.canal6_web === true) return { ...canal, url: `${baseUrl}/api/canal6` };
+            if (canal.canal7_web === true) return { ...canal, url: `${baseUrl}/api/canal7` };
+            if (canal.canal8_web === true) return { ...canal, url: `${baseUrl}/api/canal8` };
             return canal;
         });
 
         res.json(resultado);
-
     } catch (error) {
         console.error('Error obteniendo canales:', error.message);
         res.status(500).json({ error: 'No se pudo obtener la lista de canales' });
     }
 });
 
-
 /* =========================================================
    CANAL 5 - TELEMICRO
 ========================================================= */
 
-async function obtenerCookiesTelemicro() {
-    try {
-        const respuesta = await axios.get(
-            'https://telemicro.com.do/telemicro-en-vivo/',
-            {
-                httpsAgent,
-                timeout: 15000,
-                headers: {
-                    'User-Agent':
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-                    'Accept':
-                        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-                }
-            }
-        );
-
-        const setCookie = respuesta.headers['set-cookie'];
-        if (!setCookie) return '';
-
-        return setCookie.map(cookie => cookie.split(';')[0]).join('; ');
-    } catch (error) {
-        console.error('Error obteniendo cookies Telemicro:', error.message);
-        return '';
-    }
-}
-
-async function obtenerPlaylistTelemicro() {
-    const cookies = await obtenerCookiesTelemicro();
-    const headers = {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-        'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
-        'Referer': 'https://telemicro.com.do/',
-        'Origin': 'https://telemicro.com.do'
-    };
-
-    if (cookies) headers['Cookie'] = cookies;
-
-    const respuesta = await axios.get(TELEMICRO_PLAYLIST, {
-        httpsAgent,
-        timeout: 15000,
-        headers,
-        responseType: 'text'
-    });
-
-    return { texto: respuesta.data, cookies };
-}
-
 app.get('/api/telemicro', async (req, res) => {
     try {
-        const resultado = await obtenerPlaylistTelemicro();
-        let playlist = resultado.texto;
-        const cookies = resultado.cookies;
-        const baseUrl = obtenerBaseUrl(req);
+        const headers = {
+            'User-Agent': USER_AGENT,
+            'Accept': '*/*',
+            'Referer': 'https://telemicro.com.do/',
+            'Origin': 'https://telemicro.com.do'
+        };
 
-        const lineas = playlist.split(/\r?\n/);
+        const respuesta = await axios.get(TELEMICRO_PLAYLIST, {
+            httpsAgent,
+            timeout: 15000,
+            headers,
+            responseType: 'text'
+        });
+
+        const baseUrl = obtenerBaseUrl(req);
+        const lineas = respuesta.data.split(/\r?\n/);
+
         const nuevasLineas = lineas.map(linea => {
             const lineaTrim = linea.trim();
-
-            if (
-                lineaTrim &&
-                !lineaTrim.startsWith('#') &&
-                (lineaTrim.endsWith('.ts') || lineaTrim.includes('.ts?'))
-            ) {
+            if (lineaTrim && !lineaTrim.startsWith('#')) {
                 let urlSegmento = lineaTrim;
                 if (!urlSegmento.startsWith('http')) {
                     urlSegmento = new URL(urlSegmento, TELEMICRO_BASE).href;
                 }
-                return `${baseUrl}/api/telemicro/segment?url=${encodeURIComponent(urlSegmento)}&cookies=${encodeURIComponent(cookies)}`;
+                return `${baseUrl}/api/telemicro/segment?url=${encodeURIComponent(urlSegmento)}`;
             }
-
             return linea;
         });
 
@@ -192,72 +148,53 @@ app.get('/api/telemicro', async (req, res) => {
         res.send(nuevasLineas.join('\n'));
 
     } catch (error) {
-        console.error('Error Canal 5:', error.response?.status || error.message);
-        res.status(500).send(`Error Canal 5: ${error.response?.status || error.message}`);
+        console.error('Error Canal 5:', error.message);
+        res.status(500).send(`Error Canal 5: ${error.message}`);
     }
 });
 
 app.get('/api/telemicro/segment', async (req, res) => {
     try {
         const url = req.query.url;
-        const cookies = req.query.cookies || '';
-
-        if (!url) return res.status(400).send('Falta URL del segmento');
-
-        const headers = {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-            'Referer': 'https://telemicro.com.do/',
-            'Origin': 'https://telemicro.com.do'
-        };
-
-        if (cookies) headers['Cookie'] = cookies;
+        if (!url) return res.status(400).send('Falta URL');
 
         const respuesta = await axios.get(url, {
             httpsAgent,
             timeout: 20000,
-            headers,
-            responseType: 'arraybuffer'
+            responseType: 'arraybuffer',
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Referer': 'https://telemicro.com.do/',
+                'Origin': 'https://telemicro.com.do'
+            }
         });
 
         res.setHeader('Content-Type', 'video/mp2t');
         res.send(respuesta.data);
-
     } catch (error) {
-        console.error('Error segmento Telemicro:', error.response?.status || error.message);
-        res.status(500).send('Error obteniendo segmento Telemicro');
+        res.status(500).send('Error segmento Telemicro');
     }
 });
-
 
 /* =========================================================
    CANAL 6
 ========================================================= */
 
-async function obtenerCanal6(url) {
-    const respuesta = await axios.get(url, {
-        httpsAgent,
-        timeout: 15000,
-        responseType: 'text',
-        headers: {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-            'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*'
-        }
-    });
-    return respuesta.data;
-}
-
 app.get('/api/canal6', async (req, res) => {
     try {
-        const playlist = await obtenerCanal6(CANAL6_STREAM_URL);
+        const respuesta = await axios.get(CANAL6_STREAM_URL, {
+            httpsAgent,
+            timeout: 15000,
+            responseType: 'text',
+            headers: { 'User-Agent': USER_AGENT }
+        });
+
         const baseUrl = obtenerBaseUrl(req);
-        const lineas = playlist.split(/\r?\n/);
+        const lineas = respuesta.data.split(/\r?\n/);
 
         const nuevasLineas = lineas.map(linea => {
             const texto = linea.trim();
-            if (texto && !texto.startsWith('#') && texto.includes('.m3u8')) {
+            if (texto && !texto.startsWith('#')) {
                 const urlCompleta = new URL(texto, CANAL6_STREAM_URL).href;
                 return `${baseUrl}/api/canal6/subplaylist?url=${encodeURIComponent(urlCompleta)}`;
             }
@@ -265,27 +202,22 @@ app.get('/api/canal6', async (req, res) => {
         });
 
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(nuevasLineas.join('\n'));
-
     } catch (error) {
-        console.error('Error Canal 6:', error.response?.status || error.message);
-        res.status(500).send(`Error Canal 6: ${error.response?.status || error.message}`);
+        res.status(500).send('Error Canal 6');
     }
 });
 
 app.get('/api/canal6/subplaylist', async (req, res) => {
     try {
         const url = req.query.url;
-        if (!url) return res.status(400).send('Falta URL de subplaylist');
-
-        const playlist = await obtenerCanal6(url);
+        const respuesta = await axios.get(url, { httpsAgent, timeout: 15000, responseType: 'text', headers: { 'User-Agent': USER_AGENT } });
         const baseUrl = obtenerBaseUrl(req);
-        const lineas = playlist.split(/\r?\n/);
+        const lineas = respuesta.data.split(/\r?\n/);
 
         const nuevasLineas = lineas.map(linea => {
             const texto = linea.trim();
-            if (texto && !texto.startsWith('#') && (texto.endsWith('.ts') || texto.includes('.ts?'))) {
+            if (texto && !texto.startsWith('#')) {
                 const segmento = new URL(texto, url).href;
                 return `${baseUrl}/api/canal6/segment?url=${encodeURIComponent(segmento)}`;
             }
@@ -293,267 +225,137 @@ app.get('/api/canal6/subplaylist', async (req, res) => {
         });
 
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(nuevasLineas.join('\n'));
-
     } catch (error) {
-        console.error('Error subplaylist Canal 6:', error.response?.status || error.message);
-        res.status(500).send('Error obteniendo subplaylist Canal 6');
+        res.status(500).send('Error subplaylist Canal 6');
     }
 });
 
 app.get('/api/canal6/segment', async (req, res) => {
     try {
+        const respuesta = await axios.get(req.query.url, { httpsAgent, timeout: 20000, responseType: 'arraybuffer', headers: { 'User-Agent': USER_AGENT } });
+        res.setHeader('Content-Type', 'video/mp2t');
+        res.send(respuesta.data);
+    } catch (error) {
+        res.status(500).send('Error segmento Canal 6');
+    }
+});
+
+/* =========================================================
+   HELPER PROXY PARA DAILYMOTION (CANAL 7 Y CANAL 8)
+========================================================= */
+
+async function procesarDailymotion(videoId, req, res, canalNombre) {
+    try {
+        const streamUrl = await obtenerUrlDailymotion(videoId);
+        if (!streamUrl) throw new Error(`No se obtuvo URL de Dailymotion para ${canalNombre}`);
+
+        const respuesta = await axios.get(streamUrl, {
+            httpsAgent,
+            timeout: 20000,
+            responseType: 'text',
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Referer': 'https://www.dailymotion.com/'
+            }
+        });
+
+        const baseUrl = obtenerBaseUrl(req);
+        const sourceBaseUrl = new URL(streamUrl);
+        const lineas = respuesta.data.split(/\r?\n/);
+
+        const nuevasLineas = lineas.map(linea => {
+            const texto = linea.trim();
+            if (texto && !texto.startsWith('#')) {
+                const urlCompleta = new URL(texto, sourceBaseUrl).href;
+                return `${baseUrl}/api/${canalNombre}/subplaylist?url=${encodeURIComponent(urlCompleta)}`;
+            }
+            return linea;
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.send(nuevasLineas.join('\n'));
+
+    } catch (error) {
+        console.error(`Error ${canalNombre}:`, error.message);
+        res.status(500).send(`Error ${canalNombre}: ${error.message}`);
+    }
+}
+
+async function procesarSubplaylistDailymotion(req, res, canalNombre) {
+    try {
         const url = req.query.url;
-        if (!url) return res.status(400).send('Falta URL del segmento');
+        if (!url) return res.status(400).send('Falta URL');
+
+        const respuesta = await axios.get(url, {
+            httpsAgent,
+            timeout: 20000,
+            responseType: 'text',
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Referer': 'https://www.dailymotion.com/'
+            }
+        });
+
+        const baseUrl = obtenerBaseUrl(req);
+        const sourceBaseUrl = new URL(url);
+        const lineas = respuesta.data.split(/\r?\n/);
+
+        const nuevasLineas = lineas.map(linea => {
+            const texto = linea.trim();
+            if (texto && !texto.startsWith('#')) {
+                const urlAbsoluta = new URL(texto, sourceBaseUrl).href;
+                if (texto.includes('.m3u8')) {
+                    return `${baseUrl}/api/${canalNombre}/subplaylist?url=${encodeURIComponent(urlAbsoluta)}`;
+                }
+                return `${baseUrl}/api/${canalNombre}/segment?url=${encodeURIComponent(urlAbsoluta)}`;
+            }
+            return linea;
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.send(nuevasLineas.join('\n'));
+
+    } catch (error) {
+        res.status(500).send(`Error subplaylist ${canalNombre}`);
+    }
+}
+
+async function procesarSegmentoDailymotion(req, res) {
+    try {
+        const url = req.query.url;
+        if (!url) return res.status(400).send('Falta URL de segmento');
 
         const respuesta = await axios.get(url, {
             httpsAgent,
             timeout: 20000,
             responseType: 'arraybuffer',
             headers: {
-                'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-                'Accept': '*/*'
+                'User-Agent': USER_AGENT,
+                'Referer': 'https://www.dailymotion.com/'
             }
         });
 
-        res.setHeader('Content-Type', 'video/mp2t');
-        res.send(respuesta.data);
-
-    } catch (error) {
-        console.error('Error segmento Canal 6:', error.response?.status || error.message);
-        res.status(500).send('Error obteniendo segmento Canal 6');
-    }
-});
-
-
-/* =========================================================
-   CANAL 7
-========================================================= */
-
-app.get('/api/canal7', async (req, res) => {
-    try {
-        const streamUrl = await obtenerUrlDailymotion(CANAL7_VIDEO_ID);
-        if (!streamUrl) throw new Error('No se pudo obtener el stream de Dailymotion');
-
-        const headers = {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-            'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
-            'Referer': 'https://www.dailymotion.com/',
-            'Origin': 'https://www.dailymotion.com'
-        };
-
-        const respuesta = await axios.get(streamUrl, { httpsAgent, timeout: 20000, responseType: 'text', headers });
-        const playlist = respuesta.data;
-        const baseUrl = obtenerBaseUrl(req);
-        const sourceBaseUrl = new URL(streamUrl);
-
-        const lineas = playlist.split(/\r?\n/);
-        const nuevasLineas = lineas.map(linea => {
-            const texto = linea.trim();
-            if (texto && !texto.startsWith('#') && texto.includes('.m3u8')) {
-                const urlCompleta = new URL(texto, sourceBaseUrl).href;
-                return `${baseUrl}/api/canal7/subplaylist?url=${encodeURIComponent(urlCompleta)}`;
-            }
-            return linea;
-        });
-
-        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.send(nuevasLineas.join('\n'));
-
-    } catch (error) {
-        console.error('Error Canal 7:', error.message);
-        res.status(500).send(`Error Canal 7: ${error.message}`);
-    }
-});
-
-app.get('/api/canal7/subplaylist', async (req, res) => {
-    try {
-        const url = req.query.url;
-        if (!url) return res.status(400).send('Falta URL de subplaylist Canal 7');
-
-        const headers = {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-            'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
-            'Referer': 'https://www.dailymotion.com/',
-            'Origin': 'https://www.dailymotion.com'
-        };
-
-        const respuesta = await axios.get(url, { httpsAgent, timeout: 20000, responseType: 'text', headers });
-        const playlist = respuesta.data;
-        const baseUrl = obtenerBaseUrl(req);
-        const sourceBaseUrl = new URL(url);
-
-        const lineas = playlist.split(/\r?\n/);
-        const nuevasLineas = lineas.map(linea => {
-            const texto = linea.trim();
-            if (texto && !texto.startsWith('#') && texto.includes('.m3u8')) {
-                const sub = new URL(texto, sourceBaseUrl).href;
-                return `${baseUrl}/api/canal7/subplaylist?url=${encodeURIComponent(sub)}`;
-            }
-            if (texto && !texto.startsWith('#')) {
-                const segmento = new URL(texto, sourceBaseUrl).href;
-                return `${baseUrl}/api/canal7/segment?url=${encodeURIComponent(segmento)}`;
-            }
-            return linea;
-        });
-
-        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.send(nuevasLineas.join('\n'));
-
-    } catch (error) {
-        console.error('Error subplaylist Canal 7:', error.response?.status || error.message);
-        res.status(500).send(`Error subplaylist Canal 7: ${error.response?.status || error.message}`);
-    }
-});
-
-app.get('/api/canal7/segment', async (req, res) => {
-    try {
-        const url = req.query.url;
-        if (!url) return res.status(400).send('Falta URL del segmento Canal 7');
-
-        const headers = {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-            'Referer': 'https://www.dailymotion.com/',
-            'Origin': 'https://www.dailymotion.com'
-        };
-
-        const respuesta = await axios.get(url, { httpsAgent, timeout: 20000, responseType: 'arraybuffer', headers });
         res.setHeader('Content-Type', respuesta.headers['content-type'] || 'video/mp2t');
         res.send(respuesta.data);
-
     } catch (error) {
-        console.error('Error segmento Canal 7:', error.response?.status || error.message);
-        res.status(500).send('Error obteniendo segmento Canal 7');
+        res.status(500).send('Error segmento Dailymotion');
     }
-});
+}
 
+/* CANAL 7 */
+app.get('/api/canal7', (req, res) => procesarDailymotion(CANAL7_VIDEO_ID, req, res, 'canal7'));
+app.get('/api/canal7/subplaylist', (req, res) => procesarSubplaylistDailymotion(req, res, 'canal7'));
+app.get('/api/canal7/segment', (req, res) => procesarSegmentoDailymotion(req, res));
 
-/* =========================================================
-   CANAL 8 (DAILYMOTION x9hvyy0)
-========================================================= */
+/* CANAL 8 */
+app.get('/api/canal8', (req, res) => procesarDailymotion(CANAL8_VIDEO_ID, req, res, 'canal8'));
+app.get('/api/canal8/subplaylist', (req, res) => procesarSubplaylistDailymotion(req, res, 'canal8'));
+app.get('/api/canal8/segment', (req, res) => procesarSegmentoDailymotion(req, res));
 
-app.get('/api/canal8', async (req, res) => {
-    try {
-        console.log('Solicitando Canal 8 Dailymotion ID:', CANAL8_VIDEO_ID);
-        const streamUrl = await obtenerUrlDailymotion(CANAL8_VIDEO_ID);
+/* SERVIDOR */
+app.get('/', (req, res) => res.send('ROKU Backend RD funcionando correctamente'));
 
-        if (!streamUrl) throw new Error('No se pudo obtener el stream de Dailymotion');
-
-        const headers = {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-            'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
-            'Referer': 'https://www.dailymotion.com/',
-            'Origin': 'https://www.dailymotion.com'
-        };
-
-        const respuesta = await axios.get(streamUrl, { httpsAgent, timeout: 20000, responseType: 'text', headers });
-        const playlist = respuesta.data;
-        const baseUrl = obtenerBaseUrl(req);
-        const sourceBaseUrl = new URL(streamUrl);
-
-        const lineas = playlist.split(/\r?\n/);
-        const nuevasLineas = lineas.map(linea => {
-            const texto = linea.trim();
-            if (texto && !texto.startsWith('#') && texto.includes('.m3u8')) {
-                const urlCompleta = new URL(texto, sourceBaseUrl).href;
-                return `${baseUrl}/api/canal8/subplaylist?url=${encodeURIComponent(urlCompleta)}`;
-            }
-            return linea;
-        });
-
-        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.send(nuevasLineas.join('\n'));
-
-    } catch (error) {
-        console.error('Error Canal 8:', error.message);
-        res.status(500).send(`Error Canal 8: ${error.message}`);
-    }
-});
-
-app.get('/api/canal8/subplaylist', async (req, res) => {
-    try {
-        const url = req.query.url;
-        if (!url) return res.status(400).send('Falta URL de subplaylist Canal 8');
-
-        const headers = {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-            'Accept': 'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
-            'Referer': 'https://www.dailymotion.com/',
-            'Origin': 'https://www.dailymotion.com'
-        };
-
-        const respuesta = await axios.get(url, { httpsAgent, timeout: 20000, responseType: 'text', headers });
-        const playlist = respuesta.data;
-        const baseUrl = obtenerBaseUrl(req);
-        const sourceBaseUrl = new URL(url);
-
-        const lineas = playlist.split(/\r?\n/);
-        const nuevasLineas = lineas.map(linea => {
-            const texto = linea.trim();
-            if (texto && !texto.startsWith('#') && texto.includes('.m3u8')) {
-                const sub = new URL(texto, sourceBaseUrl).href;
-                return `${baseUrl}/api/canal8/subplaylist?url=${encodeURIComponent(sub)}`;
-            }
-            if (texto && !texto.startsWith('#')) {
-                const segmento = new URL(texto, sourceBaseUrl).href;
-                return `${baseUrl}/api/canal8/segment?url=${encodeURIComponent(segmento)}`;
-            }
-            return linea;
-        });
-
-        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.send(nuevasLineas.join('\n'));
-
-    } catch (error) {
-        console.error('Error subplaylist Canal 8:', error.response?.status || error.message);
-        res.status(500).send(`Error subplaylist Canal 8: ${error.response?.status || error.message}`);
-    }
-});
-
-app.get('/api/canal8/segment', async (req, res) => {
-    try {
-        const url = req.query.url;
-        if (!url) return res.status(400).send('Falta URL del segmento Canal 8');
-
-        const headers = {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-            'Referer': 'https://www.dailymotion.com/',
-            'Origin': 'https://www.dailymotion.com'
-        };
-
-        const respuesta = await axios.get(url, { httpsAgent, timeout: 20000, responseType: 'arraybuffer', headers });
-        res.setHeader('Content-Type', respuesta.headers['content-type'] || 'video/mp2t');
-        res.send(respuesta.data);
-
-    } catch (error) {
-        console.error('Error segmento Canal 8:', error.response?.status || error.message);
-        res.status(500).send('Error obteniendo segmento Canal 8');
-    }
-});
-
-
-/* =========================================================
-   RUTA PRINCIPAL Y SERVIDOR
-========================================================= */
-
-app.get('/', (req, res) => {
-    res.send('ROKU Backend RD funcionando correctamente');
-});
-
-app.listen(PORT, () => {
-    console.log(`Servidor funcionando en puerto ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
