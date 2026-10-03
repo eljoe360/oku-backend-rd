@@ -43,24 +43,21 @@ function agenteParaUrl(urlStr) {
 const CANALES_JSON = process.env.CANALES_JSON || 'https://raw.githubusercontent.com/eljoe360/channels.roku/main/channels.json';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
-/* CONFIGURACIÓN DE URLS DE CANALES */
+/* =========================================================
+   FUENTES DIRECTAS ESTABLES (SIN TOKENS EXPIRABLES)
+========================================================= */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
-const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
-const CANAL7_STREAM_URL = process.env.CANAL7_STREAM_URL || 'https://hls.tvabierta.net/hls/007.m3u8';
-const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
+const CANAL6_STREAM_URL  = process.env.CANAL6_STREAM_URL  || 'https://stream.elseis.do/canal6/master.m3u8';
+const CANAL7_STREAM_URL  = process.env.CANAL7_STREAM_URL  || 'https://hls.tvabierta.net/hls/007.m3u8';
+const CANAL8_STREAM_URL  = process.env.CANAL8_STREAM_URL  || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabierta.net/hls/010.m3u8';
 
-/* DAILYMOTION CANAL 9 */
-const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
-const CANAL9_FALLBACK_URL = 'https://live.eu-north-1a.cf.dmcdn.net/sec2(KLqkM_kGjzvssE3oSBAg843Zt3GQcvNHH3se76sPlBHe00GQi686UcQlwa12qp-_wueAIi8_yN4NIIBUvESn5PQn6yUmxMs3f63VZ57dJYM3GHLghyK_7I75nZn13lcY)/dm/3/x7gy059/d/live-480.m3u8?startdate=2026-09-03T23%3A24%3A16%2B0000';
-
-/* DAILYMOTION CANAL 11 */
+/* =========================================================
+   IDENTIFICADORES DAILYMOTION (EXTRACCIÓN DINÁMICA 100% ACTIVA)
+========================================================= */
+const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
 const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
-const CANAL11_MASTER_URL = 'https://live2.eu-north-1b.cf.dmcdn.net/sec2(BC2EhsEpta4dqDBBPYVP5vHPT2FerfUkqAyav3OyZKVjhliiI-jWH6YoRCYufyux0CbFw0zCUnEOaA8E1dS3F9arAGEOS0oIXRwZtMeOk2iEo-y-UtvmAgKzRdfjsRXK)/cloud/3/x80ac48/d/live-480.m3u8';
-
-/* DAILYMOTION CANAL 12 */
 const CANAL12_VIDEO_ID = process.env.CANAL12_VIDEO_ID || 'xaio352';
-const CANAL12_MASTER_URL = 'https://live2.eu-north-1b.cf.dmcdn.net/sec2(kz8_oh4mhkU3VJFgU7xURxo_J9wW6F8DK-6muQznABq_nQT14kXDW9kBcyoadI_VDKxEDutLYPUnfxcdygTZniz9Zr6d8qSoVt3CIILhh82PMJbM6YI-MjVJr6BHxEbo)/cloud/3/xaio352/s/live-480.m3u8';
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -100,7 +97,7 @@ setInterval(() => {
 }, LIMITE_VENTANA_MS).unref();
 
 /* =========================================================
-   UTILIDADES Y FIRMAS
+   UTILIDADES Y FIRMAS HMAC
 ========================================================= */
 function obtenerBaseUrl(req) {
     if (PUBLIC_URL) return PUBLIC_URL;
@@ -136,12 +133,12 @@ function validarParametrosProxy(req, res) {
 }
 
 /* =========================================================
-   EXTRACTOR DAILYMOTION
+   EXTRACTOR AUTOMÁTICO DE DAILYMOTION
 ========================================================= */
-const DM_CACHE_MS = 15 * 1000;
+const DM_CACHE_MS = 15 * 1000; // Caché ultra corto de 15 segundos para refresco continuo de tokens
 const dmCache = new Map();
 
-async function extraerStreamDailymotion(videoId, fallbackUrl) {
+async function extraerStreamDailymotion(videoId) {
     const ahora = Date.now();
     const cacheKey = `dm_${videoId}`;
     const cached = dmCache.get(cacheKey);
@@ -169,14 +166,14 @@ async function extraerStreamDailymotion(videoId, fallbackUrl) {
             }
         }
     } catch (e) {
-        console.error(`[Dailymotion Error] ${videoId}:`, e.message);
+        console.error(`[Dailymotion Extractor Error] Video ID ${videoId}:`, e.message);
     }
 
-    return fallbackUrl;
+    return null;
 }
 
 /* =========================================================
-   PROCESADOR DE PLAYLISTS M3U8
+   PROCESADOR PROXY Y REESCRITOR DE MANIFIESTOS M3U8
 ========================================================= */
 async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
     try {
@@ -216,13 +213,13 @@ async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(nuevasLineas.join('\n'));
     } catch (error) {
-        console.error('[Error M3U8]:', error.message);
+        console.error('[Error Procesando M3U8]:', error.message);
         res.status(500).send('Error procesando transmisión');
     }
 }
 
 /* =========================================================
-   ENDPOINTS PROXY
+   ENDPOINTS PROXY GENERALES
 ========================================================= */
 app.get('/api/proxy/subplaylist', async (req, res) => {
     const params = validarParametrosProxy(req, res);
@@ -259,7 +256,7 @@ app.get('/api/proxy/segment', async (req, res) => {
 });
 
 /* =========================================================
-   RUTAS DE CANALES
+   RUTAS DE LOS CANALES
 ========================================================= */
 app.get('/api/canales', async (req, res) => {
     try {
@@ -305,8 +302,8 @@ app.get('/api/canal8', async (req, res) => {
 });
 
 app.get('/api/canal9', async (req, res) => {
-    const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID, CANAL9_FALLBACK_URL);
-    if (!streamUrl) return res.status(503).send('Sin señal Canal 9');
+    const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
+    if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 9');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
@@ -315,14 +312,14 @@ app.get('/api/canal10', async (req, res) => {
 });
 
 app.get('/api/canal11', async (req, res) => {
-    let streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_MASTER_URL);
-    if (!streamUrl) streamUrl = CANAL11_MASTER_URL;
+    const streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID);
+    if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 11');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
 app.get('/api/canal12', async (req, res) => {
-    let streamUrl = await extraerStreamDailymotion(CANAL12_VIDEO_ID, CANAL12_MASTER_URL);
-    if (!streamUrl) streamUrl = CANAL12_MASTER_URL;
+    const streamUrl = await extraerStreamDailymotion(CANAL12_VIDEO_ID);
+    if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 12');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
