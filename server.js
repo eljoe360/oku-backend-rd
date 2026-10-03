@@ -34,9 +34,10 @@ function obtenerBaseUrl(req) {
 }
 
 /* =========================================================
-   EXTRACTOR EN TIEMPO REAL DE DAILYMOTION (CANAL 7 Y 8)
+   EXTRACTOR DE DAILYMOTION ANTI-CAÍDAS (CANAL 7 Y 8)
 ========================================================= */
 async function obtenerStreamDailymotionFresco(videoId) {
+    // Intento 1: API Metadata Interna
     try {
         const metadataUrl = `https://www.dailymotion.com/player/metadata/video/${videoId}`;
         const respuesta = await axios.get(metadataUrl, {
@@ -44,23 +45,141 @@ async function obtenerStreamDailymotionFresco(videoId) {
             timeout: 8000,
             headers: {
                 'User-Agent': USER_AGENT,
-                'Referer': `https://www.dailymotion.com/embed/video/${videoId}`
+                'Referer': `https://www.dailymotion.com/embed/video/${videoId}`,
+                'Accept': 'application/json'
             }
         });
 
         if (respuesta.data && respuesta.data.qualities) {
             const qualities = respuesta.data.qualities;
             const autoList = qualities.auto || Object.values(qualities).flat();
-            
-            // Buscar la transmisión de video M3U8
             const videoStream = autoList.find(q => q.url && q.url.includes('.m3u8') && !q.url.includes('live-aac'));
-            if (videoStream) return videoStream.url;
+            if (videoStream?.url) return videoStream.url;
             if (autoList[0]?.url) return autoList[0].url;
         }
     } catch (e) {
-        console.error(`Error extrayendo Dailymotion (${videoId}):`, e.message);
+        console.error(`Intento 1 Dailymotion falló (${videoId}):`, e.message);
     }
+
+    // Intento 2: Raspado directo de la página de Embed
+    try {
+        const embedUrl = `https://www.dailymotion.com/embed/video/${videoId}`;
+        const embedRes = await axios.get(embedUrl, {
+            httpsAgent,
+            timeout: 8000,
+            headers: { 'User-Agent': USER_AGENT }
+        });
+
+        const match = embedRes.data.match(/"qualities":\s*({.*?}),"type"/);
+        if (match && match[1]) {
+            const parsed = JSON.parse(match[1]);
+            const autoList = parsed.auto || Object.values(parsed).flat();
+            const stream = autoList.find(q => q.url && q.url.includes('.m3u8'));
+            if (stream?.url) return stream.url;
+        }
+    } catch (e) {
+        console.error(`Intento 2 Dailymotion falló (${videoId}):`, e.message);
+    }
+
     return null;
+}
+
+async function procesarDailymotionProxy(videoId, req, res, canalNombre) {
+    try {
+        const freshUrl = await obtenerStreamDailymotionFresco(videoId);
+        if (!freshUrl) {
+            return res.status(503).send(`No se pudo obtener señal activa para ${canalNombre}`);
+        }
+
+        // Obtener el contenido de la playlist M3U8 para servirla proxada
+        const playlistRes = await axios.get(freshUrl, {
+            httpsAgent,
+            timeout: 10000,
+            responseType: 'text',
+            headers: {
+                'User-Agent': USER_AGENT,
+                'Referer': 'https://www.dailymotion.com/'
+            }
+        });
+
+        const baseUrl = obtenerBaseUrl(req);
+        const sourceBaseUrl = new URL(freshUrl);
+        const lineas = playlistRes.data.split(/\r?\n/);
+
+        const nuevasLineas = lineas.map(linea => {
+            const texto = linea.trim();
+            if (texto && !texto.startsWith('#')) {
+                const urlAbsoluta = new URL(texto, sourceBaseUrl).href;
+                if (texto.includes('.m3u8')) {
+                    return `${baseUrl}/api/${canalNombre}/subplaylist?url=${encodeURIComponent(urlAbsoluta)}`;
+                }
+                return `${baseUrl}/api/${canalNombre}/segment?url=${encodeURIComponent(urlAbsoluta)}`;
+            }
+            return linea;
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.send(nuevasLineas.join('\n'));
+    } catch (error) {
+        console.error(`Error procesando ${canalNombre}:`, error.message);
+        res.status(500).send(`Error en transmisión de ${canalNombre}`);
+    }
+}
+
+async function procesarSubplaylistDailymotion(req, res, canalNombre) {
+    try {
+        const url = req.query.url;
+        if (!url) return res.status(400).send('Falta URL');
+
+        const respuesta = await axios.get(url, {
+            httpsAgent,
+            timeout: 10000,
+            responseType: 'text',
+            headers: { 'User-Agent': USER_AGENT, 'Referer': 'https://www.dailymotion.com/' }
+        });
+
+        const baseUrl = obtenerBaseUrl(req);
+        const sourceBaseUrl = new URL(url);
+        const lineas = respuesta.data.split(/\r?\n/);
+
+        const nuevasLineas = lineas.map(linea => {
+            const texto = linea.trim();
+            if (texto && !texto.startsWith('#')) {
+                const urlAbsoluta = new URL(texto, sourceBaseUrl).href;
+                if (texto.includes('.m3u8')) {
+                    return `${baseUrl}/api/${canalNombre}/subplaylist?url=${encodeURIComponent(urlAbsoluta)}`;
+                }
+                return `${baseUrl}/api/${canalNombre}/segment?url=${encodeURIComponent(urlAbsoluta)}`;
+            }
+            return linea;
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.send(nuevasLineas.join('\n'));
+    } catch (error) {
+        res.status(500).send(`Error subplaylist ${canalNombre}`);
+    }
+}
+
+async function procesarSegmentoDailymotion(req, res) {
+    try {
+        const url = req.query.url;
+        if (!url) return res.status(400).send('Falta URL de segmento');
+
+        const respuesta = await axios.get(url, {
+            httpsAgent,
+            timeout: 15000,
+            responseType: 'arraybuffer',
+            headers: { 'User-Agent': USER_AGENT, 'Referer': 'https://www.dailymotion.com/' }
+        });
+
+        res.setHeader('Content-Type', respuesta.headers['content-type'] || 'video/mp2t');
+        res.send(respuesta.data);
+    } catch (error) {
+        res.status(500).send('Error de segmento');
+    }
 }
 
 /* =========================================================
@@ -88,36 +207,18 @@ app.get('/api/canales', async (req, res) => {
 });
 
 /* =========================================================
-   2. CANAL 8 (DINÁMICO - SIN TOKEN CAÍDO)
+   2. CANAL 8
 ========================================================= */
-app.get('/api/canal8', async (req, res) => {
-    try {
-        const freshUrl = await obtenerStreamDailymotionFresco(CANAL8_VIDEO_ID);
-
-        if (!freshUrl) {
-            return res.status(503).send('No se pudo generar un token fresco para Canal 8');
-        }
-
-        // Redirige al stream directo recién firmado con sec2() válido en tiempo real
-        res.redirect(302, freshUrl);
-    } catch (error) {
-        console.error('Error Canal 8:', error.message);
-        res.status(500).send('Error procesando Canal 8');
-    }
-});
+app.get('/api/canal8', (req, res) => procesarDailymotionProxy(CANAL8_VIDEO_ID, req, res, 'canal8'));
+app.get('/api/canal8/subplaylist', (req, res) => procesarSubplaylistDailymotion(req, res, 'canal8'));
+app.get('/api/canal8/segment', (req, res) => procesarSegmentoDailymotion(req, res));
 
 /* =========================================================
    3. CANAL 7
 ========================================================= */
-app.get('/api/canal7', async (req, res) => {
-    try {
-        const freshUrl = await obtenerStreamDailymotionFresco(CANAL7_VIDEO_ID);
-        if (!freshUrl) return res.status(503).send('Error Canal 7');
-        res.redirect(302, freshUrl);
-    } catch (error) {
-        res.status(500).send('Error Canal 7');
-    }
-});
+app.get('/api/canal7', (req, res) => procesarDailymotionProxy(CANAL7_VIDEO_ID, req, res, 'canal7'));
+app.get('/api/canal7/subplaylist', (req, res) => procesarSubplaylistDailymotion(req, res, 'canal7'));
+app.get('/api/canal7/segment', (req, res) => procesarSegmentoDailymotion(req, res));
 
 /* =========================================================
    4. CANAL 5 (TELEMICRO)
@@ -157,6 +258,7 @@ app.get('/api/telemicro', async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(nuevasLineas.join('\n'));
     } catch (error) {
+        console.error('Error Canal 5:', error.message);
         res.status(500).send('Error Canal 5');
     }
 });
@@ -209,6 +311,7 @@ app.get('/api/canal6', async (req, res) => {
         });
 
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(nuevasLineas.join('\n'));
     } catch (error) {
         res.status(500).send('Error Canal 6');
@@ -218,7 +321,13 @@ app.get('/api/canal6', async (req, res) => {
 app.get('/api/canal6/subplaylist', async (req, res) => {
     try {
         const url = req.query.url;
-        const respuesta = await axios.get(url, { httpsAgent, timeout: 15000, responseType: 'text', headers: { 'User-Agent': USER_AGENT } });
+        const respuesta = await axios.get(url, {
+            httpsAgent,
+            timeout: 15000,
+            responseType: 'text',
+            headers: { 'User-Agent': USER_AGENT }
+        });
+
         const baseUrl = obtenerBaseUrl(req);
         const lineas = respuesta.data.split(/\r?\n/);
 
@@ -232,6 +341,7 @@ app.get('/api/canal6/subplaylist', async (req, res) => {
         });
 
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(nuevasLineas.join('\n'));
     } catch (error) {
         res.status(500).send('Error subplaylist Canal 6');
@@ -240,7 +350,12 @@ app.get('/api/canal6/subplaylist', async (req, res) => {
 
 app.get('/api/canal6/segment', async (req, res) => {
     try {
-        const respuesta = await axios.get(req.query.url, { httpsAgent, timeout: 20000, responseType: 'arraybuffer', headers: { 'User-Agent': USER_AGENT } });
+        const respuesta = await axios.get(req.query.url, {
+            httpsAgent,
+            timeout: 20000,
+            responseType: 'arraybuffer',
+            headers: { 'User-Agent': USER_AGENT }
+        });
         res.setHeader('Content-Type', 'video/mp2t');
         res.send(respuesta.data);
     } catch (error) {
