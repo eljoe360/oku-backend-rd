@@ -44,16 +44,17 @@ const CANALES_JSON = process.env.CANALES_JSON || 'https://raw.githubusercontent.
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 /* =========================================================
-   FUENTES DIRECTAS ESTABLES
+   FUENTES DIRECTAS ESTABLES (SIN TOKENS NI SESIONES EXPIRABLES)
 ========================================================= */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL  = process.env.CANAL6_STREAM_URL  || 'https://stream.elseis.do/canal6/master.m3u8';
 const CANAL7_STREAM_URL  = process.env.CANAL7_STREAM_URL  || 'https://hls.tvabierta.net/hls/007.m3u8';
 const CANAL8_STREAM_URL  = process.env.CANAL8_STREAM_URL  || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabierta.net/hls/010.m3u8';
+const CANAL13_STREAM_URL = process.env.CANAL13_STREAM_URL || 'https://live2.telemicro.com.do/live/telecentrocast_1080p/chunks.m3u8';
 
 /* =========================================================
-   IDENTIFICADORES DAILYMOTION (EXTRACCIÓN DINÁMICA)
+   IDENTIFICADORES DAILYMOTION (EXTRACCIÓN DINÁMICA 100% ACTIVA)
 ========================================================= */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
 const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
@@ -293,6 +294,7 @@ app.get('/api/canales', async (req, res) => {
             else if (canal.canal10_web) targetUrl = `${baseUrl}/api/canal10`;
             else if (canal.canal11_web) targetUrl = `${baseUrl}/api/canal11`;
             else if (canal.canal12_web) targetUrl = `${baseUrl}/api/canal12`;
+            else if (canal.canal13_web) targetUrl = `${baseUrl}/api/canal13`;
 
             return { ...canal, url: targetUrl };
         });
@@ -339,6 +341,10 @@ app.get('/api/canal12', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL12_VIDEO_ID);
     if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 12');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
+});
+
+app.get('/api/canal13', async (req, res) => {
+    await procesarPlaylistProxy(CANAL13_STREAM_URL, req, res, 'https://telemicro.com.do/');
 });
 
 app.get('/', (req, res) => res.send('ROKU Backend RD OK'));
