@@ -1,4 +1,3 @@
-```javascript
 const express = require('express');
 const axios = require('axios');
 
@@ -305,8 +304,9 @@ app.get(
             );
 
 
-            return res.end(
-                Buffer.from(response.data)
+            // CORREGIDO: Se envía el buffer directamente sin envolverlo nuevamente en Buffer.from
+            return res.send(
+                response.data
             );
 
         } catch (error) {
@@ -596,8 +596,9 @@ app.get(
             );
 
 
-            return res.end(
-                Buffer.from(response.data)
+            // CORREGIDO: Se envía el buffer de video directamente
+            return res.send(
+                response.data
             );
 
         } catch (error) {
@@ -698,6 +699,10 @@ async function obtenerPlaylistCanal7() {
         await axios.get(
             CANAL7_MASTER,
             {
+                // CORREGIDO: Se especifica tipo de respuesta texto explícito
+                responseType:
+                    'text',
+
                 headers: {
                     'User-Agent':
                         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
@@ -738,10 +743,9 @@ async function obtenerPlaylistCanal7() {
     }
 
 
+    // CORREGIDO: response.data ya es un string gracias a responseType: 'text'
     const playlist =
-        Buffer
-            .from(response.data)
-            .toString('utf8');
+        response.data;
 
 
     const baseUrl =
@@ -993,8 +997,9 @@ app.get(
             );
 
 
-            return res.end(
-                Buffer.from(response.data)
+            // CORREGIDO: Se envía el buffer de video directamente sin reconvertir
+            return res.send(
+                response.data
             );
 
         } catch (error) {
@@ -1116,6 +1121,14 @@ app.get(
                 );
 
 
+            // CORREGIDO: Construcción dinámica de la URL basándose en el servidor actual
+            const protocol =
+                req.headers['x-forwarded-proto'] || req.protocol;
+
+            const host =
+                req.get('host');
+
+
             const resultado =
                 canalesValidos.map(
                     function(canal) {
@@ -1132,7 +1145,10 @@ app.get(
                         ) {
 
                             nuevo.url =
-                                'https://oku-backend-rd.onrender.com/api/telemicro';
+                                protocol +
+                                '://' +
+                                host +
+                                '/api/telemicro';
                         }
 
 
@@ -1180,7 +1196,7 @@ app.get(
 
 
 // ======================================================
-// RENDER
+// SERVER
 // ======================================================
 
 app.listen(
@@ -1193,4 +1209,3 @@ app.listen(
         );
     }
 );
-```
