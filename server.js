@@ -53,8 +53,9 @@ const CANAL7_ANTMEDIA_URL = process.env.CANAL7_STREAM_URL || 'http://190.122.104
 /* CANAL 8 - TELEMEDIOS */
 const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 
-/* CANAL 9 - COLOR VISIÓN (DAILYMOTION INDEPENDIENTE) */
+/* CANAL 9 - COLOR VISIÓN (DAILYMOTION INDEPENDIENTE + FALLBACK M3U8) */
 const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
+const CANAL9_STATIC_M3U8 = 'https://live.eu-north-1a.cf.dmcdn.net/sec2(KLqkM_kGjzvssE3oSBAg843Zt3GQcvNHH3se76sPlBHe00GQi686UcQlwa12qp-_wueAIi8_yN4NIIBUvESn5PQn6yUmxMs3f63VZ57dJYM3GHLghyK_7I75nZn13lcY)/dm/3/x7gy059/d/live-480.m3u8?startdate=2026-09-03T23%3A24%3A16%2B0000';
 
 /* WINDTVO API */
 const WINDTVO_API_URL = 'http://198.244.227.59:88/ttl_api_channel.php';
@@ -160,14 +161,15 @@ async function obtenerStreamWindTVO(channelId) {
 }
 
 /* =========================================================
-   EXTRACTOR DAILYMOTION (CANAL 9 EXCLUSIVO)
+   EXTRACTOR DAILYMOTION (CANAL 9 EXCLUSIVO CON FALLBACK)
 ========================================================= */
 const DM_CACHE_MS = 20 * 1000;
 const dmCache = new Map();
 
 async function extraerStreamDailymotion(videoId) {
     const ahora = Date.now();
-    const cached = dmCache.get(videoId);
+    const cacheKey = `dm_${videoId}`;
+    const cached = dmCache.get(cacheKey);
     if (cached && cached.expira > ahora) return cached.url;
 
     try {
@@ -187,14 +189,16 @@ async function extraerStreamDailymotion(videoId) {
             const autoList = qualities.auto || Object.values(qualities).flat();
             const videoStream = autoList.find(q => q.url && q.url.includes('.m3u8'));
             if (videoStream?.url) {
-                dmCache.set(videoId, { url: videoStream.url, expira: ahora + DM_CACHE_MS });
+                dmCache.set(cacheKey, { url: videoStream.url, expira: ahora + DM_CACHE_MS });
                 return videoStream.url;
             }
         }
     } catch (e) {
-        console.error(`[Dailymotion Error] ${videoId}:`, e.message);
+        console.error(`[Dailymotion Extractor Error] ${videoId}:`, e.message, '- Usando enlace M3U8 directo');
     }
-    return null;
+
+    // Fallback: Si falla la extracción dinámica, retorna la URL M3U8 directa
+    return CANAL9_STATIC_M3U8;
 }
 
 /* =========================================================
@@ -314,17 +318,14 @@ app.get('/api/canal6', async (req, res) => {
     await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
 });
 
-/* CANAL 7 - ANTENA 7 (PROXY M3U8) */
 app.get('/api/canal7', async (req, res) => {
     await procesarPlaylistProxy(CANAL7_ANTMEDIA_URL, req, res);
 });
 
-/* CANAL 8 - TELEMEDIOS */
 app.get('/api/canal8', async (req, res) => {
     await procesarPlaylistProxy(CANAL8_STREAM_URL, req, res);
 });
 
-/* CANAL 9 - COLOR VISIÓN */
 app.get('/api/canal9', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
     if (!streamUrl) return res.status(503).send('Sin señal Canal 9');
