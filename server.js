@@ -334,7 +334,7 @@ app.get('/api/canal9', async (req, res) => {
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
-/* CANAL 11 PRINCIPAL: CONMUTACIÓN AUTOMÁTICA WINDTVO / DAILYMOTION */
+/* CANAL 11 PRINCIPAL (TV ABIERTA CON FALLBACK A DAILYMOTION) */
 app.get('/api/canal11', async (req, res) => {
     let streamUrl = await obtenerStreamWindTVO('11');
     let referer = 'http://lb.windtvo.do:88/';
@@ -348,7 +348,7 @@ app.get('/api/canal11', async (req, res) => {
     await procesarPlaylistProxy(streamUrl, req, res, referer);
 });
 
-/* CANAL 11.1 SEGUNDARIO: SEÑAL DAILYMOTION EXCLUSIVA */
+/* CANAL 11.1 SEGUNDARIO (SEÑAL WEB DAILYMOTION) */
 app.get('/api/canal11-dm', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_FALLBACK_URL);
     if (!streamUrl) return res.status(503).send('Sin señal Canal 11.1');
