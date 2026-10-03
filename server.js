@@ -45,7 +45,6 @@ app.get('/api/canales', async (req, res) => {
 
         const canalesValidos = canales.filter(canal => {
             if (!canal.vencimiento) return true;
-
             return new Date(canal.vencimiento) > ahora;
         });
 
@@ -61,13 +60,9 @@ app.get('/api/canales', async (req, res) => {
 
             if (canal.telemicro_web) {
                 nuevo.url = `${baseUrl}/api/telemicro`;
-            }
-
-            else if (canal.canal6_web) {
+            } else if (canal.canal6_web) {
                 nuevo.url = `${baseUrl}/api/canal6`;
-            }
-
-            else if (canal.canal7_web) {
+            } else if (canal.canal7_web) {
                 nuevo.url = `${baseUrl}/api/canal7`;
             }
 
@@ -78,7 +73,8 @@ app.get('/api/canales', async (req, res) => {
 
     } catch (error) {
         console.log(
-            'Error leyendo canales JSON: ' + error.message
+            'Error leyendo canales JSON:',
+            error.message
         );
 
         return res.status(500).json({
@@ -125,7 +121,7 @@ async function obtenerStreamTelemicro() {
     } catch (error) {
 
         console.log(
-            'Error cookies Telemicro: ' +
+            'Error cookies Telemicro:',
             error.message
         );
     }
@@ -240,16 +236,12 @@ async function obtenerPlaylistTelemicro() {
         const texto = linea.trim();
 
         if (!texto) {
-
             resultado.push('');
-
             continue;
         }
 
         if (texto.startsWith('#')) {
-
             resultado.push(texto);
-
             continue;
         }
 
@@ -275,44 +267,36 @@ app.get('/api/telemicro/proxy', async (req, res) => {
     try {
 
         const url = req.query.url;
-
-        const cookie =
-            req.query.cookie || '';
+        const cookie = req.query.cookie || '';
 
         if (!url) {
-
-            return res
-                .status(400)
-                .send('Falta URL');
+            return res.status(400).send('Falta URL');
         }
 
-        const response =
-            await axios.get(
-                url,
-                {
-                    responseType:
-                        'arraybuffer',
+        const response = await axios.get(
+            url,
+            {
+                responseType: 'arraybuffer',
 
-                    headers: {
+                headers: {
 
-                        'User-Agent':
-                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'User-Agent':
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
 
-                        'Referer':
-                            'https://telemicro.com.do/',
+                    'Referer':
+                        'https://telemicro.com.do/',
 
-                        'Accept':
-                            '*/*',
+                    'Accept':
+                        '*/*',
 
-                        'Cookie':
-                            cookie
-                    },
+                    'Cookie':
+                        cookie
+                },
 
-                    timeout: 30000,
-
-                    maxRedirects: 10
-                }
-            );
+                timeout: 30000,
+                maxRedirects: 10
+            }
+        );
 
         res.setHeader(
             'Content-Type',
@@ -324,9 +308,7 @@ app.get('/api/telemicro/proxy', async (req, res) => {
             'no-cache'
         );
 
-        return res.send(
-            response.data
-        );
+        return res.send(response.data);
 
     } catch (error) {
 
@@ -337,9 +319,7 @@ app.get('/api/telemicro/proxy', async (req, res) => {
 
         return res
             .status(502)
-            .send(
-                'Error segmento Telemicro'
-            );
+            .send('Error segmento Telemicro');
     }
 });
 
@@ -360,9 +340,7 @@ app.get('/api/telemicro', async (req, res) => {
             'no-cache, no-store, must-revalidate'
         );
 
-        return res.send(
-            playlist
-        );
+        return res.send(playlist);
 
     } catch (error) {
 
@@ -373,42 +351,37 @@ app.get('/api/telemicro', async (req, res) => {
 
         return res
             .status(502)
-            .send(
-                'Error Telemicro'
-            );
+            .send('Error Telemicro');
     }
 });
 
 // ======================================================
 // CANAL 6 - EL SEIS
-// MASTER ADAPTATIVO
 // ======================================================
 
 const CANAL6_STREAM_URL =
     'https://stream.elseis.do/canal6/master.m3u8';
 
-// Obtener playlist de Canal 6
 async function obtenerPlaylistCanal6() {
 
-    const response =
-        await axios.get(
-            CANAL6_STREAM_URL,
-            {
-                headers: {
+    const response = await axios.get(
+        CANAL6_STREAM_URL,
+        {
+            headers: {
 
-                    'User-Agent':
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
 
-                    'Accept':
-                        '*/*',
+                'Accept':
+                    '*/*',
 
-                    'Referer':
-                        'https://elseis.do/'
-                },
+                'Referer':
+                    'https://elseis.do/'
+            },
 
-                timeout: 20000
-            }
-        );
+            timeout: 20000
+        }
+    );
 
     const baseUrl =
         new URL(CANAL6_STREAM_URL);
@@ -423,17 +396,12 @@ async function obtenerPlaylistCanal6() {
         const texto = linea.trim();
 
         if (!texto) {
-
             resultado.push('');
-
             continue;
         }
 
-        // Mantener etiquetas HLS
         if (texto.startsWith('#')) {
-
             resultado.push(texto);
-
             continue;
         }
 
@@ -443,11 +411,7 @@ async function obtenerPlaylistCanal6() {
                 baseUrl
             ).href;
 
-        // Si apunta a otra playlist M3U8,
-        // mantenerla mediante nuestro servidor
-        if (
-            texto.includes('.m3u8')
-        ) {
+        if (texto.includes('.m3u8')) {
 
             resultado.push(
                 '/api/canal6/subplaylist?url=' +
@@ -466,254 +430,122 @@ async function obtenerPlaylistCanal6() {
     return resultado.join('\n');
 }
 
-// Subplaylist de Canal 6
-app.get(
-    '/api/canal6/subplaylist',
-    async (req, res) => {
+app.get('/api/canal6/subplaylist', async (req, res) => {
 
-        try {
+    try {
 
-            const subUrl =
-                req.query.url;
+        const subUrl = req.query.url;
 
-            if (!subUrl) {
-
-                return res
-                    .status(400)
-                    .send('Falta URL');
-            }
-
-            const response =
-                await axios.get(
-                    subUrl,
-                    {
-                        headers: {
-
-                            'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-
-                            'Accept':
-                                '*/*',
-
-                            'Referer':
-                                'https://elseis.do/'
-                        },
-
-                        timeout: 20000
-                    }
-                );
-
-            const baseUrl =
-                new URL(subUrl);
-
-            const lineas =
-                response.data.split(/\r?\n/);
-
-            const resultado = [];
-
-            for (const linea of lineas) {
-
-                const texto =
-                    linea.trim();
-
-                if (!texto) {
-
-                    resultado.push('');
-
-                    continue;
-                }
-
-                if (texto.startsWith('#')) {
-
-                    resultado.push(texto);
-
-                    continue;
-                }
-
-                const urlAbsoluta =
-                    new URL(
-                        texto,
-                        baseUrl
-                    ).href;
-
-                if (
-                    texto.includes('.m3u8')
-                ) {
-
-                    resultado.push(
-                        '/api/canal6/subplaylist?url=' +
-                        encodeURIComponent(
-                            urlAbsoluta
-                        )
-                    );
-
-                } else {
-
-                    resultado.push(
-                        '/api/canal6/proxy?url=' +
-                        encodeURIComponent(
-                            urlAbsoluta
-                        )
-                    );
-                }
-            }
-
-            res.setHeader(
-                'Content-Type',
-                'application/vnd.apple.mpegurl'
-            );
-
-            res.setHeader(
-                'Cache-Control',
-                'no-cache, no-store, must-revalidate'
-            );
-
-            return res.send(
-                resultado.join('\n')
-            );
-
-        } catch (error) {
-
-            console.log(
-                'Error subplaylist Canal 6:',
-                error.message
-            );
-
-            return res
-                .status(502)
-                .send(
-                    'Error subplaylist Canal 6'
-                );
+        if (!subUrl) {
+            return res.status(400).send('Falta URL');
         }
-    }
-);
 
-// Proxy de segmentos Canal 6
-app.get(
-    '/api/canal6/proxy',
-    async (req, res) => {
-
-        try {
-
-            const url =
-                req.query.url;
-
-            if (!url) {
-
-                return res
-                    .status(400)
-                    .send('Falta URL');
-            }
-
-            const response =
-                await axios.get(
-                    url,
-                    {
-                        responseType:
-                            'arraybuffer',
-
-                        headers: {
-
-                            'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-
-                            'Accept':
-                                '*/*',
-
-                            'Referer':
-                                'https://elseis.do/'
-                        },
-
-                        timeout: 30000
-                    }
-                );
-
-            res.setHeader(
-                'Content-Type',
-                'video/mp2t'
-            );
-
-            res.setHeader(
-                'Cache-Control',
-                'no-cache'
-            );
-
-            return res.send(
-                response.data
-            );
-
-        } catch (error) {
-
-            console.log(
-                'Error segmento Canal 6:',
-                error.message
-            );
-
-            return res
-                .status(502)
-                .send(
-                    'Error segmento Canal 6'
-                );
-        }
-    }
-);
-
-// Canal 6 principal
-app.get(
-    '/api/canal6',
-    async (req, res) => {
-
-        try {
-
-            const playlist =
-                await obtenerPlaylistCanal6();
-
-            res.setHeader(
-                'Content-Type',
-                'application/vnd.apple.mpegurl'
-            );
-
-            res.setHeader(
-                'Cache-Control',
-                'no-cache, no-store, must-revalidate'
-            );
-
-            return res.send(
-                playlist
-            );
-
-        } catch (error) {
-
-            console.log(
-                'Error Canal 6:',
-                error.message
-            );
-
-            return res
-                .status(502)
-                .send(
-                    'Error Canal 6'
-                );
-        }
-    }
-);
-
-// ======================================================
-// CANAL 7 - ANTENA 7
-// URL CLOUDFRONT DIRECTA
-// ======================================================
-
-const CANAL7_STREAM_URL =
-    'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
-
-// Obtener playlist Canal 7
-async function obtenerPlaylistCanal7() {
-
-    const response =
-        await axios.get(
-            CANAL7_STREAM_URL,
+        const response = await axios.get(
+            subUrl,
             {
-                httpsAgent: httpsAgent,
+                headers: {
+
+                    'User-Agent':
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+
+                    'Accept':
+                        '*/*',
+
+                    'Referer':
+                        'https://elseis.do/'
+                },
+
+                timeout: 20000
+            }
+        );
+
+        const baseUrl =
+            new URL(subUrl);
+
+        const lineas =
+            response.data.split(/\r?\n/);
+
+        const resultado = [];
+
+        for (const linea of lineas) {
+
+            const texto = linea.trim();
+
+            if (!texto) {
+                resultado.push('');
+                continue;
+            }
+
+            if (texto.startsWith('#')) {
+                resultado.push(texto);
+                continue;
+            }
+
+            const urlAbsoluta =
+                new URL(
+                    texto,
+                    baseUrl
+                ).href;
+
+            if (texto.includes('.m3u8')) {
+
+                resultado.push(
+                    '/api/canal6/subplaylist?url=' +
+                    encodeURIComponent(urlAbsoluta)
+                );
+
+            } else {
+
+                resultado.push(
+                    '/api/canal6/proxy?url=' +
+                    encodeURIComponent(urlAbsoluta)
+                );
+            }
+        }
+
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.apple.mpegurl'
+        );
+
+        res.setHeader(
+            'Cache-Control',
+            'no-cache, no-store, must-revalidate'
+        );
+
+        return res.send(
+            resultado.join('\n')
+        );
+
+    } catch (error) {
+
+        console.log(
+            'Error subplaylist Canal 6:',
+            error.message
+        );
+
+        return res
+            .status(502)
+            .send(
+                'Error subplaylist Canal 6'
+            );
+    }
+});
+
+app.get('/api/canal6/proxy', async (req, res) => {
+
+    try {
+
+        const url = req.query.url;
+
+        if (!url) {
+            return res.status(400).send('Falta URL');
+        }
+
+        const response = await axios.get(
+            url,
+            {
+                responseType: 'arraybuffer',
 
                 headers: {
 
@@ -723,76 +555,258 @@ async function obtenerPlaylistCanal7() {
                     'Accept':
                         '*/*',
 
-                    'Origin':
-                        'https://www.antena7.com.do',
-
                     'Referer':
-                        'https://www.antena7.com.do/'
+                        'https://elseis.do/'
                 },
 
-                timeout: 20000
+                timeout: 30000
             }
         );
 
-    const baseUrl =
-        new URL(CANAL7_STREAM_URL);
+        res.setHeader(
+            'Content-Type',
+            'video/mp2t'
+        );
 
-    const lineas =
-        response.data.split(/\r?\n/);
+        res.setHeader(
+            'Cache-Control',
+            'no-cache'
+        );
 
-    const resultado = [];
+        return res.send(response.data);
 
-    for (const linea of lineas) {
+    } catch (error) {
 
-        const texto =
-            linea.trim();
+        console.log(
+            'Error segmento Canal 6:',
+            error.message
+        );
 
-        if (!texto) {
+        return res
+            .status(502)
+            .send(
+                'Error segmento Canal 6'
+            );
+    }
+});
 
-            resultado.push('');
+app.get('/api/canal6', async (req, res) => {
 
-            continue;
+    try {
+
+        const playlist =
+            await obtenerPlaylistCanal6();
+
+        res.setHeader(
+            'Content-Type',
+            'application/vnd.apple.mpegurl'
+        );
+
+        res.setHeader(
+            'Cache-Control',
+            'no-cache, no-store, must-revalidate'
+        );
+
+        return res.send(playlist);
+
+    } catch (error) {
+
+        console.log(
+            'Error Canal 6:',
+            error.message
+        );
+
+        return res
+            .status(502)
+            .send(
+                'Error Canal 6'
+            );
+    }
+});
+
+// ======================================================
+// CANAL 7 - ANTENA 7 / CLOUDFRONT
+// ======================================================
+
+const CANAL7_STREAM_URL =
+    'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
+
+const CANAL7_HEADERS = {
+
+    'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+
+    'Accept':
+        '*/*',
+
+    'Origin':
+        'https://www.antena7.com.do',
+
+    'Referer':
+        'https://www.antena7.com.do/'
+};
+
+// ======================================================
+// OBTENER PLAYLIST CANAL 7
+// ======================================================
+
+async function obtenerPlaylistCanal7() {
+
+    try {
+
+        console.log(
+            'Canal 7: solicitando playlist CloudFront...'
+        );
+
+        const response = await axios.get(
+            CANAL7_STREAM_URL,
+            {
+                httpsAgent: httpsAgent,
+
+                headers:
+                    CANAL7_HEADERS,
+
+                timeout: 20000,
+
+                validateStatus: () => true
+            }
+        );
+
+        console.log(
+            'Canal 7 HTTP:',
+            response.status
+        );
+
+        console.log(
+            'Canal 7 Content-Type:',
+            response.headers['content-type']
+        );
+
+        if (response.status !== 200) {
+
+            let detalle = '';
+
+            if (typeof response.data === 'string') {
+
+                detalle =
+                    response.data.substring(
+                        0,
+                        500
+                    );
+            }
+
+            console.log(
+                'Canal 7 respuesta CloudFront:',
+                detalle
+            );
+
+            throw new Error(
+                `CloudFront HTTP ${response.status}`
+            );
         }
 
-        // Mantener las etiquetas HLS
-        if (texto.startsWith('#')) {
-
-            resultado.push(texto);
-
-            continue;
-        }
-
-        const urlAbsoluta =
-            new URL(
-                texto,
-                baseUrl
-            ).href;
-
-        // Si es otra playlist M3U8
         if (
-            texto.includes('.m3u8')
+            typeof response.data !== 'string' ||
+            !response.data.includes('#EXTM3U')
         ) {
 
-            resultado.push(
-                '/api/canal7/subplaylist?url=' +
-                encodeURIComponent(
-                    urlAbsoluta
-                )
+            console.log(
+                'Canal 7: la respuesta no parece una playlist HLS'
             );
 
-        } else {
+            console.log(
+                'Contenido recibido:',
+                String(response.data).substring(0, 500)
+            );
 
-            // Segmento de video
-            resultado.push(
-                '/api/canal7/proxy?url=' +
-                encodeURIComponent(
-                    urlAbsoluta
-                )
+            throw new Error(
+                'CloudFront no devolvió una playlist HLS válida'
             );
         }
-    }
 
-    return resultado.join('\n');
+        const baseUrl =
+            new URL(CANAL7_STREAM_URL);
+
+        const lineas =
+            response.data.split(/\r?\n/);
+
+        const resultado = [];
+
+        for (const linea of lineas) {
+
+            const texto =
+                linea.trim();
+
+            if (!texto) {
+
+                resultado.push('');
+
+                continue;
+            }
+
+            if (texto.startsWith('#')) {
+
+                resultado.push(texto);
+
+                continue;
+            }
+
+            const urlAbsoluta =
+                new URL(
+                    texto,
+                    baseUrl
+                ).href;
+
+            if (
+                texto.includes('.m3u8')
+            ) {
+
+                resultado.push(
+                    '/api/canal7/subplaylist?url=' +
+                    encodeURIComponent(
+                        urlAbsoluta
+                    )
+                );
+
+            } else {
+
+                resultado.push(
+                    '/api/canal7/proxy?url=' +
+                    encodeURIComponent(
+                        urlAbsoluta
+                    )
+                );
+            }
+        }
+
+        return resultado.join('\n');
+
+    } catch (error) {
+
+        console.log(
+            '======================================'
+        );
+
+        console.log(
+            'ERROR CANAL 7'
+        );
+
+        console.log(
+            'Mensaje:',
+            error.message
+        );
+
+        console.log(
+            'URL:',
+            CANAL7_STREAM_URL
+        );
+
+        console.log(
+            '======================================'
+        );
+
+        throw error;
+    }
 }
 
 // ======================================================
@@ -815,6 +829,11 @@ app.get(
                     .send('Falta URL');
             }
 
+            console.log(
+                'Canal 7 subplaylist:',
+                subUrl
+            );
+
             const response =
                 await axios.get(
                     subUrl,
@@ -822,24 +841,27 @@ app.get(
                         httpsAgent:
                             httpsAgent,
 
-                        headers: {
+                        headers:
+                            CANAL7_HEADERS,
 
-                            'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                        timeout: 20000,
 
-                            'Accept':
-                                '*/*',
-
-                            'Origin':
-                                'https://www.antena7.com.do',
-
-                            'Referer':
-                                'https://www.antena7.com.do/'
-                        },
-
-                        timeout: 20000
+                        validateStatus:
+                            () => true
                     }
                 );
+
+            console.log(
+                'Canal 7 subplaylist HTTP:',
+                response.status
+            );
+
+            if (response.status !== 200) {
+
+                throw new Error(
+                    `Subplaylist HTTP ${response.status}`
+                );
+            }
 
             const baseUrl =
                 new URL(subUrl);
@@ -874,7 +896,6 @@ app.get(
                         baseUrl
                     ).href;
 
-                // Si todavía apunta a otra M3U8
                 if (
                     texto.includes('.m3u8')
                 ) {
@@ -957,24 +978,30 @@ app.get(
                         httpsAgent:
                             httpsAgent,
 
-                        headers: {
+                        headers:
+                            CANAL7_HEADERS,
 
-                            'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                        timeout: 30000,
 
-                            'Accept':
-                                '*/*',
-
-                            'Origin':
-                                'https://www.antena7.com.do',
-
-                            'Referer':
-                                'https://www.antena7.com.do/'
-                        },
-
-                        timeout: 30000
+                        validateStatus:
+                            () => true
                     }
                 );
+
+            if (response.status !== 200) {
+
+                console.log(
+                    'Canal 7 segmento HTTP:',
+                    response.status
+                );
+
+                return res
+                    .status(502)
+                    .send(
+                        'Error segmento Canal 7 HTTP ' +
+                        response.status
+                    );
+            }
 
             res.setHeader(
                 'Content-Type',
@@ -1016,6 +1043,18 @@ app.get(
 
         try {
 
+            console.log(
+                '======================================'
+            );
+
+            console.log(
+                'SOLICITUD CANAL 7'
+            );
+
+            console.log(
+                '======================================'
+            );
+
             const playlist =
                 await obtenerPlaylistCanal7();
 
@@ -1043,7 +1082,8 @@ app.get(
             return res
                 .status(502)
                 .send(
-                    'Error Canal 7'
+                    'Error Canal 7: ' +
+                    error.message
                 );
         }
     }
