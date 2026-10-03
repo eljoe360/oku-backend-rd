@@ -46,16 +46,12 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 /* CONFIGURACIÓN DE URLS DE CANALES */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
-
-/* CANAL 7 - ANTENA 7 (SITV / ANTMEDIA) */
 const CANAL7_ANTMEDIA_URL = process.env.CANAL7_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/sitv2000038941.m3u8';
-
-/* CANAL 8 - TELEMEDIOS */
 const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 
-/* CANAL 9 - COLOR VISIÓN (DAILYMOTION INDEPENDIENTE + FALLBACK M3U8) */
+/* CANAL 9 - COLOR VISIÓN (DAILYMOTION) */
 const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
-const CANAL9_STATIC_M3U8 = 'https://live.eu-north-1a.cf.dmcdn.net/sec2(KLqkM_kGjzvssE3oSBAg843Zt3GQcvNHH3se76sPlBHe00GQi686UcQlwa12qp-_wueAIi8_yN4NIIBUvESn5PQn6yUmxMs3f63VZ57dJYM3GHLghyK_7I75nZn13lcY)/dm/3/x7gy059/d/live-480.m3u8?startdate=2026-09-03T23%3A24%3A16%2B0000';
+const CANAL9_FALLBACK_URL = 'https://live.eu-north-1a.cf.dmcdn.net/sec2(KLqkM_kGjzvssE3oSBAg843Zt3GQcvNHH3se76sPlBHe00GQi686UcQlwa12qp-_wueAIi8_yN4NIIBUvESn5PQn6yUmxMs3f63VZ57dJYM3GHLghyK_7I75nZn13lcY)/dm/3/x7gy059/d/live-480.m3u8?startdate=2026-09-03T23%3A24%3A16%2B0000';
 
 /* WINDTVO API */
 const WINDTVO_API_URL = 'http://198.244.227.59:88/ttl_api_channel.php';
@@ -161,14 +157,14 @@ async function obtenerStreamWindTVO(channelId) {
 }
 
 /* =========================================================
-   EXTRACTOR DAILYMOTION (CANAL 9 EXCLUSIVO CON FALLBACK)
+   EXTRACTOR DAILYMOTION (CANAL 9 EXCLUSIVO)
 ========================================================= */
-const DM_CACHE_MS = 20 * 1000;
+const DM_CACHE_MS = 15 * 1000;
 const dmCache = new Map();
 
 async function extraerStreamDailymotion(videoId) {
     const ahora = Date.now();
-    const cacheKey = `dm_${videoId}`;
+    const cacheKey = `dm_canal9_${videoId}`;
     const cached = dmCache.get(cacheKey);
     if (cached && cached.expira > ahora) return cached.url;
 
@@ -194,11 +190,11 @@ async function extraerStreamDailymotion(videoId) {
             }
         }
     } catch (e) {
-        console.error(`[Dailymotion Extractor Error] ${videoId}:`, e.message, '- Usando enlace M3U8 directo');
+        console.error(`[Dailymotion Canal 9 Error] ${videoId}:`, e.message);
     }
 
-    // Fallback: Si falla la extracción dinámica, retorna la URL M3U8 directa
-    return CANAL9_STATIC_M3U8;
+    // Fallback al enlace M3U8 directo si la API dinámica falla
+    return CANAL9_FALLBACK_URL;
 }
 
 /* =========================================================
@@ -294,11 +290,12 @@ app.get('/api/canales', async (req, res) => {
         const baseUrl = obtenerBaseUrl(req);
 
         const resultado = canales.map(canal => {
+            // Evaluaciones estrictas e independientes por propiedad
+            if (canal.canal9_web) return { ...canal, url: `${baseUrl}/api/canal9` };
+            if (canal.canal8_web) return { ...canal, url: `${baseUrl}/api/canal8` };
             if (canal.telemicro_web) return { ...canal, url: `${baseUrl}/api/telemicro` };
             if (canal.canal6_web) return { ...canal, url: `${baseUrl}/api/canal6` };
             if (canal.canal7_web) return { ...canal, url: `${baseUrl}/api/canal7` };
-            if (canal.canal8_web) return { ...canal, url: `${baseUrl}/api/canal8` };
-            if (canal.canal9_web) return { ...canal, url: `${baseUrl}/api/canal9` };
             if (canal.canal11_web) return { ...canal, url: `${baseUrl}/api/canal11` };
             if (canal.canal13_web) return { ...canal, url: `${baseUrl}/api/canal13` };
             return canal;
