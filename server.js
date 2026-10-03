@@ -55,11 +55,8 @@ const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
 
 const CANAL9_FALLBACK_URL = 'https://live.eu-north-1a.cf.dmcdn.net/sec2(KLqkM_kGjzvssE3oSBAg843Zt3GQcvNHH3se76sPlBHe00GQi686UcQlwa12qp-_wueAIi8_yN4NIIBUvESn5PQn6yUmxMs3f63VZ57dJYM3GHLghyK_7I75nZn13lcY)/dm/3/x7gy059/d/live-480.m3u8?startdate=2026-09-03T23%3A24%3A16%2B0000';
 
-/* CANAL 11 PRINCIPAL DIRECTO */
+/* CANAL 11 PRINCIPAL: URL DIRECTA PROPORCIONADA */
 const CANAL11_DIRECT_URL = 'https://live2.eu-north-1b.cf.dmcdn.net/sec2(BC2EhsEpta4dqDBBPYVP5vHPT2FerfUkqAyav3OyZKVjhliiI-jWH6YoRCYufyux0CbFw0zCUnEOaA8E1dS3F9arAGEOS0oIXRwZtMeOk2iEo-y-UtvmAgKzRdfjsRXK)/cloud/3/x80ac48/d/live-480.m3u8';
-
-/* WINDTVO API */
-const WINDTVO_API_URL = 'http://198.244.227.59:88/ttl_api_channel.php';
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -132,33 +129,6 @@ function validarParametrosProxy(req, res) {
     if (!urlHttpValida(url)) { res.status(400).send('URL inválida'); return null; }
     if (!firmaValida(url, ref, sig)) { res.status(403).send('Firma inválida'); return null; }
     return { url, ref };
-}
-
-/* =========================================================
-   EXTRACTOR WINDTVO
-========================================================= */
-async function obtenerStreamWindTVO(channelId) {
-    try {
-        const bodyData = new URLSearchParams({ channel_id: channelId }).toString();
-        const respuesta = await axios.post(WINDTVO_API_URL, bodyData, {
-            httpAgent: agenteHttp,
-            timeout: 6000,
-            headers: {
-                'Host': 'lb.windtvo.do:88',
-                'User-Agent': USER_AGENT,
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
-
-        if (typeof respuesta.data === 'string' && respuesta.data.includes('.m3u8')) {
-            return respuesta.data.trim();
-        } else if (respuesta.data?.url) {
-            return respuesta.data.url;
-        }
-    } catch (e) {
-        console.error(`[WindTVO Error] Canal ${channelId}:`, e.message);
-    }
-    return null;
 }
 
 /* =========================================================
@@ -285,7 +255,7 @@ app.get('/api/proxy/segment', async (req, res) => {
 });
 
 /* =========================================================
-   RUTAS DE CANALES Y SUBCANALES
+   RUTAS DE CANALES
 ========================================================= */
 app.get('/api/canales', async (req, res) => {
     try {
@@ -303,7 +273,6 @@ app.get('/api/canales', async (req, res) => {
             else if (canal.canal9_web) targetUrl = `${baseUrl}/api/canal9`;
             else if (canal.canal11_web) targetUrl = `${baseUrl}/api/canal11`;
             else if (canal.canal11_dm_web) targetUrl = `${baseUrl}/api/canal11-dm`;
-            else if (canal.canal13_web) targetUrl = `${baseUrl}/api/canal13`;
 
             return { ...canal, url: targetUrl };
         });
@@ -336,22 +305,16 @@ app.get('/api/canal9', async (req, res) => {
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
-/* CANAL 11 PRINCIPAL: ENLACE DIRECTO M3U8 QUE ENVIASTE */
+/* CANAL 11 PRINCIPAL: INTENTA PRIMERO EXTRACTOR Y SI FALLA USA TU URL DIRECTA */
 app.get('/api/canal11', async (req, res) => {
-    await procesarPlaylistProxy(CANAL11_DIRECT_URL, req, res, 'https://www.dailymotion.com/');
-});
-
-/* CANAL 11.1 SEGUNDARIO: EXTRAÍDO VÍA API DAILYMOTION (x80ac48) */
-app.get('/api/canal11-dm', async (req, res) => {
-    const streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_DIRECT_URL);
-    if (!streamUrl) return res.status(503).send('Sin señal Canal 11.1');
+    let streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_DIRECT_URL);
+    if (!streamUrl) streamUrl = CANAL11_DIRECT_URL;
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
-app.get('/api/canal13', async (req, res) => {
-    const streamUrl = await obtenerStreamWindTVO('13');
-    if (!streamUrl) return res.status(503).send('Sin señal Canal 13');
-    await procesarPlaylistProxy(streamUrl, req, res, 'http://lb.windtvo.do:88/');
+/* CANAL 11.1 (WEB): USA TU URL DIRECTA COMO STREAM PRINCIPAL */
+app.get('/api/canal11-dm', async (req, res) => {
+    await procesarPlaylistProxy(CANAL11_DIRECT_URL, req, res, 'https://www.dailymotion.com/');
 });
 
 app.get('/', (req, res) => res.send('ROKU Backend RD OK'));
