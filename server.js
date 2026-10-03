@@ -38,8 +38,7 @@ const CANAL6_STREAM_URL =
 
 /* ---------- CANAL 7 ---------- */
 
-const CANAL7_STREAM_URL =
-    'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8?utm_source=chatgpt.com';
+const CANAL7_VIDEO_ID = 'x9hvyy0';
 
 
 /* =========================================================
@@ -565,62 +564,33 @@ app.get('/api/canal6/segment', async (req, res) => {
 
 /* =========================================================
    CANAL 7
-   ANTENA 7
+   ANTENA 7 (DAILYMOTION)
 ========================================================= */
 
-async function obtenerPlaylistCanal7(url) {
-
-    const headers = {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
-
-        'Accept':
-            'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
-
-        'Accept-Language':
-            'es-DO,es;q=0.9,en;q=0.8',
-
-        'Referer':
-            'https://antena7.com.do/',
-
-        'Origin':
-            'https://antena7.com.do'
-    };
-
-    const respuesta =
-        await axios.get(
-            url,
-            {
-                httpsAgent,
-                timeout: 20000,
-                responseType: 'text',
-                headers,
-                validateStatus: () => true
+async function obtenerUrlDailymotion(videoId) {
+    try {
+        const metadataUrl = `https://www.dailymotion.com/player/metadata/video/${videoId}`;
+        const respuesta = await axios.get(metadataUrl, {
+            httpsAgent,
+            timeout: 10000,
+            headers: {
+                'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+                'Referer': 'https://www.dailymotion.com/'
             }
-        );
+        });
 
-    console.log(
-        'Canal 7 HTTP:',
-        respuesta.status
-    );
-
-    console.log(
-        'Canal 7 Content-Type:',
-        respuesta.headers['content-type']
-    );
-
-    if (
-        respuesta.status !== 200 ||
-        !respuesta.data ||
-        !respuesta.data.includes('#EXTM3U')
-    ) {
-
-        throw new Error(
-            `CloudFront HTTP ${respuesta.status}`
-        );
+        if (respuesta.data && respuesta.data.qualities) {
+            const qualities = respuesta.data.qualities;
+            const autoQuality = qualities.auto || Object.values(qualities)[0];
+            if (autoQuality && autoQuality[0] && autoQuality[0].url) {
+                return autoQuality[0].url;
+            }
+        }
+    } catch (error) {
+        console.error('Error obteniendo metadata Canal 7 Dailymotion:', error.message);
     }
-
-    return respuesta.data;
+    return null;
 }
 
 
@@ -630,48 +600,61 @@ app.get('/api/canal7', async (req, res) => {
 
     try {
 
-        console.log(
-            'Solicitando Canal 7:'
+        console.log('Solicitando Canal 7 Dailymotion ID:', CANAL7_VIDEO_ID);
+
+        const streamUrl = await obtenerUrlDailymotion(CANAL7_VIDEO_ID);
+
+        if (!streamUrl) {
+            throw new Error('No se pudo obtener la URL del stream desde Dailymotion');
+        }
+
+        const headers = {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+
+            'Accept':
+                'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+
+            'Referer':
+                'https://www.dailymotion.com/',
+
+            'Origin':
+                'https://www.dailymotion.com'
+        };
+
+        const respuesta = await axios.get(
+            streamUrl,
+            {
+                httpsAgent,
+                timeout: 20000,
+                responseType: 'text',
+                headers
+            }
         );
 
-        console.log(
-            CANAL7_STREAM_URL
-        );
+        const playlist = respuesta.data;
+        const baseUrl = obtenerBaseUrl(req);
+        const sourceBaseUrl = new URL(streamUrl);
 
-        const playlist =
-            await obtenerPlaylistCanal7(
-                CANAL7_STREAM_URL
-            );
+        const lineas = playlist.split(/\r?\n/);
 
-        const baseUrl =
-            obtenerBaseUrl(req);
+        const nuevasLineas = lineas.map(linea => {
 
-        const lineas =
-            playlist.split(/\r?\n/);
+            const texto = linea.trim();
 
-        const nuevasLineas =
-            lineas.map(linea => {
+            if (
+                texto &&
+                !texto.startsWith('#') &&
+                texto.includes('.m3u8')
+            ) {
 
-                const texto =
-                    linea.trim();
+                const urlCompleta = new URL(texto, sourceBaseUrl).href;
 
-                if (
-                    texto &&
-                    !texto.startsWith('#') &&
-                    texto.includes('.m3u8')
-                ) {
+                return `${baseUrl}/api/canal7/subplaylist?url=${encodeURIComponent(urlCompleta)}`;
+            }
 
-                    const urlCompleta =
-                        new URL(
-                            texto,
-                            CANAL7_STREAM_URL
-                        ).href;
-
-                    return `${baseUrl}/api/canal7/subplaylist?url=${encodeURIComponent(urlCompleta)}`;
-                }
-
-                return linea;
-            });
+            return linea;
+        });
 
         res.setHeader(
             'Content-Type',
@@ -707,8 +690,7 @@ app.get('/api/canal7/subplaylist', async (req, res) => {
 
     try {
 
-        const url =
-            req.query.url;
+        const url = req.query.url;
 
         if (!url) {
             return res.status(400).send(
@@ -723,78 +705,63 @@ app.get('/api/canal7/subplaylist', async (req, res) => {
             'Accept':
                 'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
 
-            'Accept-Language':
-                'es-DO,es;q=0.9,en;q=0.8',
-
             'Referer':
-                'https://antena7.com.do/',
+                'https://www.dailymotion.com/',
 
             'Origin':
-                'https://antena7.com.do'
+                'https://www.dailymotion.com'
         };
 
-        const respuesta =
-            await axios.get(
-                url,
-                {
-                    httpsAgent,
-                    timeout: 20000,
-                    responseType: 'text',
-                    headers
-                }
-            );
+        const respuesta = await axios.get(
+            url,
+            {
+                httpsAgent,
+                timeout: 20000,
+                responseType: 'text',
+                headers
+            }
+        );
 
-        const playlist =
-            respuesta.data;
+        const playlist = respuesta.data;
+        const baseUrl = obtenerBaseUrl(req);
+        const sourceBaseUrl = new URL(url);
 
-        const baseUrl =
-            obtenerBaseUrl(req);
+        const lineas = playlist.split(/\r?\n/);
 
-        const lineas =
-            playlist.split(/\r?\n/);
+        const nuevasLineas = lineas.map(linea => {
 
-        const nuevasLineas =
-            lineas.map(linea => {
+            const texto = linea.trim();
 
-                const texto =
-                    linea.trim();
+            if (
+                texto &&
+                !texto.startsWith('#') &&
+                texto.includes('.m3u8')
+            ) {
 
-                if (
-                    texto &&
-                    !texto.startsWith('#') &&
-                    texto.includes('.m3u8')
-                ) {
+                const sub = new URL(texto, sourceBaseUrl).href;
 
-                    const sub =
-                        new URL(
-                            texto,
-                            url
-                        ).href;
+                return `${baseUrl}/api/canal7/subplaylist?url=${encodeURIComponent(sub)}`;
+            }
 
-                    return `${baseUrl}/api/canal7/subplaylist?url=${encodeURIComponent(sub)}`;
-                }
+            if (
+                texto &&
+                !texto.startsWith('#') &&
+                (
+                    texto.includes('.ts') ||
+                    texto.includes('.aac') ||
+                    texto.includes('.mp4') ||
+                    texto.includes('.frag') ||
+                    !texto.startsWith('#')
+                )
+            ) {
 
-                if (
-                    texto &&
-                    !texto.startsWith('#') &&
-                    (
-                        texto.includes('.ts') ||
-                        texto.includes('.aac') ||
-                        texto.includes('.mp4')
-                    )
-                ) {
+                const segmento = new URL(texto, sourceBaseUrl).href;
 
-                    const segmento =
-                        new URL(
-                            texto,
-                            url
-                        ).href;
+                return `${baseUrl}/api/canal7/segment?url=${encodeURIComponent(segmento)}`;
+            }
 
-                    return `${baseUrl}/api/canal7/segment?url=${encodeURIComponent(segmento)}`;
-                }
-
-                return linea;
-            });
+            return linea;
+        });
 
         res.setHeader(
             'Content-Type',
@@ -830,8 +797,7 @@ app.get('/api/canal7/segment', async (req, res) => {
 
     try {
 
-        const url =
-            req.query.url;
+        const url = req.query.url;
 
         if (!url) {
             return res.status(400).send(
@@ -847,27 +813,25 @@ app.get('/api/canal7/segment', async (req, res) => {
                 '*/*',
 
             'Referer':
-                'https://antena7.com.do/',
+                'https://www.dailymotion.com/',
 
             'Origin':
-                'https://antena7.com.do'
+                'https://www.dailymotion.com'
         };
 
-        const respuesta =
-            await axios.get(
-                url,
-                {
-                    httpsAgent,
-                    timeout: 20000,
-                    responseType: 'arraybuffer',
-                    headers
-                }
-            );
+        const respuesta = await axios.get(
+            url,
+            {
+                httpsAgent,
+                timeout: 20000,
+                responseType: 'arraybuffer',
+                headers
+            }
+        );
 
         res.setHeader(
             'Content-Type',
-            respuesta.headers['content-type'] ||
-            'video/mp2t'
+            respuesta.headers['content-type'] || 'video/mp2t'
         );
 
         res.send(
