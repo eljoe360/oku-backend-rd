@@ -5,7 +5,7 @@ const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Agente HTTPS para omitir restricciones SSL/TLS estrictas en CloudFront o servidores antiguos
+// Agente HTTPS para omitir restricciones SSL/TLS estrictas
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
     keepAlive: true
@@ -261,13 +261,12 @@ app.get('/api/canal6', async (req, res) => {
 });
 
 // ======================================================
-// CANAL 7 (ANTENA 7 / CLOUDFRONT - DIRECT MEDIA PLAYLIST)
+// CANAL 7 (ANTENA 7 - SUB-PLAYLIST DIRECTA)
 // ======================================================
-const CANAL7_DIRECT_URL = 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
+const CANAL7_MEDIALIST_URL = 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
 
 async function obtenerPlaylistCanal7() {
-    // Pide la media playlist de segmentos de video directamente
-    const response = await axios.get(CANAL7_DIRECT_URL, {
+    const response = await axios.get(CANAL7_MEDIALIST_URL, {
         httpsAgent: httpsAgent,
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -278,18 +277,18 @@ async function obtenerPlaylistCanal7() {
         timeout: 20000
     });
 
-    const baseUrl = new URL(CANAL7_DIRECT_URL);
+    const baseUrl = new URL(CANAL7_MEDIALIST_URL);
     const lineas = response.data.split(/\r?\n/);
     const resultado = [];
 
-    // Convierte cada segmento .ts a una URL relativa de tu proxy
+    // Convierte seg_..._hls.ts en https://d3gie3ig6argu.cloudfront.net/seg_..._hls.ts pasándolo por tu proxy
     for (const linea of lineas) {
         const texto = linea.trim();
         if (!texto) { resultado.push(''); continue; }
         if (texto.startsWith('#')) { resultado.push(texto); continue; }
 
-        const urlSegmento = new URL(texto, baseUrl).href;
-        resultado.push('/api/canal7/proxy?url=' + encodeURIComponent(urlSegmento));
+        const urlSegmentoAbsoluta = new URL(texto, baseUrl).href;
+        resultado.push('/api/canal7/proxy?url=' + encodeURIComponent(urlSegmentoAbsoluta));
     }
 
     return resultado.join('\n');
