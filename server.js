@@ -53,8 +53,9 @@ const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.2
 const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
 const CANAL9_FALLBACK_URL = 'https://live.eu-north-1a.cf.dmcdn.net/sec2(KLqkM_kGjzvssE3oSBAg843Zt3GQcvNHH3se76sPlBHe00GQi686UcQlwa12qp-_wueAIi8_yN4NIIBUvESn5PQn6yUmxMs3f63VZ57dJYM3GHLghyK_7I75nZn13lcY)/dm/3/x7gy059/d/live-480.m3u8?startdate=2026-09-03T23%3A24%3A16%2B0000';
 
-/* DAILYMOTION CANAL 11 (UNICA URL PARA 11 Y 11.1) */
-const CANAL11_STREAM_URL = 'https://live2.eu-north-1b.cf.dmcdn.net/sec2(BC2EhsEpta4dqDBBPYVP5vHPT2FerfUkqAyav3OyZKVjhliiI-jWH6YoRCYufyux0CbFw0zCUnEOaA8E1dS3F9arAGEOS0oIXRwZtMeOk2iEo-y-UtvmAgKzRdfjsRXK)/cloud/3/x80ac48/d/live-480.m3u8';
+/* CANAL 11 PRINCIPAL (DAILYMOTION) */
+const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
+const CANAL11_MASTER_URL = 'https://live2.eu-north-1b.cf.dmcdn.net/sec2(BC2EhsEpta4dqDBBPYVP5vHPT2FerfUkqAyav3OyZKVjhliiI-jWH6YoRCYufyux0CbFw0zCUnEOaA8E1dS3F9arAGEOS0oIXRwZtMeOk2iEo-y-UtvmAgKzRdfjsRXK)/cloud/3/x80ac48/d/live-480.m3u8';
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -130,7 +131,7 @@ function validarParametrosProxy(req, res) {
 }
 
 /* =========================================================
-   EXTRACTOR DAILYMOTION (CANAL 9)
+   EXTRACTOR DAILYMOTION
 ========================================================= */
 const DM_CACHE_MS = 15 * 1000;
 const dmCache = new Map();
@@ -270,7 +271,6 @@ app.get('/api/canales', async (req, res) => {
             else if (canal.canal8_web) targetUrl = `${baseUrl}/api/canal8`;
             else if (canal.canal9_web) targetUrl = `${baseUrl}/api/canal9`;
             else if (canal.canal11_web) targetUrl = `${baseUrl}/api/canal11`;
-            else if (canal.canal11_dm_web) targetUrl = `${baseUrl}/api/canal11-dm`;
 
             return { ...canal, url: targetUrl };
         });
@@ -305,12 +305,9 @@ app.get('/api/canal9', async (req, res) => {
 
 /* CANAL 11 PRINCIPAL */
 app.get('/api/canal11', async (req, res) => {
-    await procesarPlaylistProxy(CANAL11_STREAM_URL, req, res, 'https://www.dailymotion.com/');
-});
-
-/* CANAL 11.1 SEGUNDARIO */
-app.get('/api/canal11-dm', async (req, res) => {
-    await procesarPlaylistProxy(CANAL11_STREAM_URL, req, res, 'https://www.dailymotion.com/');
+    let streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID, CANAL11_MASTER_URL);
+    if (!streamUrl) streamUrl = CANAL11_MASTER_URL;
+    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
 app.get('/', (req, res) => res.send('ROKU Backend RD OK'));
