@@ -5,13 +5,13 @@ const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Agente HTTPS para bypass de validaciones TLS estrictas si aplica
+// Agente HTTPS para omitir restricciones SSL/TLS si aplican
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
     keepAlive: true
 });
 
-// Habilitar CORS global para clientes Roku
+// Habilitar CORS global para Roku
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -241,34 +241,12 @@ app.get('/api/canal6', async (req, res) => {
 });
 
 // ======================================================
-// CANAL 7 (ANTENA 7 - AUTO-EXTRACCIÓN Y PROXY)
+// CANAL 7 (ANTENA 7 - STREAM DIRECTO PERMANENTE)
 // ======================================================
-const CANAL7_FALLBACK_URL = 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
-
-async function obtenerUrlCanal7Actualizada() {
-    try {
-        const response = await axios.get('https://www.antena7.com.do/en-vivo/', {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-            },
-            timeout: 15000
-        });
-
-        // Buscar coincidencia de URL .m3u8 en el código fuente de la página de Antena 7
-        const match = response.data.match(/https:\/\/[^"']+\.cloudfront\.net\/[^"']+\.m3u8/);
-        if (match && match[0]) {
-            return match[0];
-        }
-    } catch (error) {
-        console.log('Error al extraer URL de Antena 7 web, usando fallback:', error.message);
-    }
-    return CANAL7_FALLBACK_URL;
-}
+const CANAL7_STREAM_URL = 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
 
 async function obtenerPlaylistCanal7() {
-    const streamUrl = await obtenerUrlCanal7Actualizada();
-
-    const response = await axios.get(streamUrl, {
+    const response = await axios.get(CANAL7_STREAM_URL, {
         httpsAgent: httpsAgent,
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -279,7 +257,7 @@ async function obtenerPlaylistCanal7() {
         timeout: 20000
     });
 
-    const baseUrl = new URL(streamUrl);
+    const baseUrl = new URL(CANAL7_STREAM_URL);
     const lineas = response.data.split(/\r?\n/);
     const resultado = [];
 
