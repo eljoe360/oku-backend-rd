@@ -631,182 +631,241 @@ app.get('/api/canal6', async (req, res) => {
 const CANAL7_STREAM_URL =
     'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
 
-const CANAL7_HEADERS = {
-
-    'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-
-    'Accept':
-        '*/*',
-
-    'Origin':
-        'https://www.antena7.com.do',
-
-    'Referer':
-        'https://www.antena7.com.do/'
-};
-
 // ======================================================
 // OBTENER PLAYLIST CANAL 7
 // ======================================================
 
+async function solicitarCanal7(url, intento) {
+
+    let headers = {};
+
+    if (intento === 1) {
+
+        headers = {
+
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+
+            'Accept':
+                'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+
+            'Accept-Language':
+                'es-DO,es;q=0.9,en-US;q=0.8,en;q=0.7',
+
+            'Referer':
+                'https://www.antena7.com.do/',
+
+            'Origin':
+                'https://www.antena7.com.do',
+
+            'Connection':
+                'keep-alive'
+        };
+
+    } else if (intento === 2) {
+
+        headers = {
+
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+
+            'Accept':
+                'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+
+            'Accept-Language':
+                'es-DO,es;q=0.9,en-US;q=0.8,en;q=0.7',
+
+            'Referer':
+                'https://www.antena7.com.do/',
+
+            'Connection':
+                'keep-alive'
+        };
+
+    } else {
+
+        headers = {
+
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+
+            'Accept':
+                '*/*',
+
+            'Accept-Language':
+                'es-DO,es;q=0.9,en-US;q=0.8,en;q=0.7',
+
+            'Referer':
+                'https://www.antena7.com.do/',
+
+            'Sec-Fetch-Dest':
+                'empty',
+
+            'Sec-Fetch-Mode':
+                'cors',
+
+            'Sec-Fetch-Site':
+                'cross-site',
+
+            'Connection':
+                'keep-alive'
+        };
+    }
+
+    return await axios.get(
+        url,
+        {
+            httpsAgent: httpsAgent,
+
+            headers: headers,
+
+            timeout: 20000,
+
+            maxRedirects: 10,
+
+            validateStatus: () => true
+        }
+    );
+}
+
 async function obtenerPlaylistCanal7() {
 
-    try {
+    console.log(
+        '======================================'
+    );
 
-        console.log(
-            'Canal 7: solicitando playlist CloudFront...'
-        );
+    console.log(
+        'CANAL 7 - INICIANDO CONEXIÓN'
+    );
 
-        const response = await axios.get(
-            CANAL7_STREAM_URL,
-            {
-                httpsAgent: httpsAgent,
+    console.log(
+        '======================================'
+    );
 
-                headers:
-                    CANAL7_HEADERS,
+    for (let intento = 1; intento <= 3; intento++) {
 
-                timeout: 20000,
-
-                validateStatus: () => true
-            }
-        );
-
-        console.log(
-            'Canal 7 HTTP:',
-            response.status
-        );
-
-        console.log(
-            'Canal 7 Content-Type:',
-            response.headers['content-type']
-        );
-
-        if (response.status !== 200) {
-
-            let detalle = '';
-
-            if (typeof response.data === 'string') {
-
-                detalle =
-                    response.data.substring(
-                        0,
-                        500
-                    );
-            }
+        try {
 
             console.log(
-                'Canal 7 respuesta CloudFront:',
-                detalle
+                'Canal 7 - intento:',
+                intento
             );
 
-            throw new Error(
-                `CloudFront HTTP ${response.status}`
-            );
-        }
-
-        if (
-            typeof response.data !== 'string' ||
-            !response.data.includes('#EXTM3U')
-        ) {
+            const response =
+                await solicitarCanal7(
+                    CANAL7_STREAM_URL,
+                    intento
+                );
 
             console.log(
-                'Canal 7: la respuesta no parece una playlist HLS'
+                'Canal 7 - HTTP:',
+                response.status
             );
 
             console.log(
-                'Contenido recibido:',
-                String(response.data).substring(0, 500)
+                'Canal 7 - Content-Type:',
+                response.headers['content-type']
             );
 
-            throw new Error(
-                'CloudFront no devolvió una playlist HLS válida'
-            );
-        }
+            if (response.status !== 200) {
 
-        const baseUrl =
-            new URL(CANAL7_STREAM_URL);
-
-        const lineas =
-            response.data.split(/\r?\n/);
-
-        const resultado = [];
-
-        for (const linea of lineas) {
-
-            const texto =
-                linea.trim();
-
-            if (!texto) {
-
-                resultado.push('');
+                console.log(
+                    'Canal 7 rechazó intento',
+                    intento,
+                    'con HTTP',
+                    response.status
+                );
 
                 continue;
             }
-
-            if (texto.startsWith('#')) {
-
-                resultado.push(texto);
-
-                continue;
-            }
-
-            const urlAbsoluta =
-                new URL(
-                    texto,
-                    baseUrl
-                ).href;
 
             if (
-                texto.includes('.m3u8')
+                typeof response.data !== 'string' ||
+                !response.data.includes('#EXTM3U')
             ) {
 
-                resultado.push(
-                    '/api/canal7/subplaylist?url=' +
-                    encodeURIComponent(
-                        urlAbsoluta
-                    )
+                console.log(
+                    'Canal 7 no devolvió M3U8 válido'
                 );
 
-            } else {
-
-                resultado.push(
-                    '/api/canal7/proxy?url=' +
-                    encodeURIComponent(
-                        urlAbsoluta
-                    )
-                );
+                continue;
             }
+
+            console.log(
+                'Canal 7 - playlist recibida correctamente'
+            );
+
+            const baseUrl =
+                new URL(CANAL7_STREAM_URL);
+
+            const lineas =
+                response.data.split(/\r?\n/);
+
+            const resultado = [];
+
+            for (const linea of lineas) {
+
+                const texto =
+                    linea.trim();
+
+                if (!texto) {
+
+                    resultado.push('');
+
+                    continue;
+                }
+
+                if (texto.startsWith('#')) {
+
+                    resultado.push(texto);
+
+                    continue;
+                }
+
+                const urlAbsoluta =
+                    new URL(
+                        texto,
+                        baseUrl
+                    ).href;
+
+                if (
+                    texto.includes('.m3u8')
+                ) {
+
+                    resultado.push(
+                        '/api/canal7/subplaylist?url=' +
+                        encodeURIComponent(
+                            urlAbsoluta
+                        )
+                    );
+
+                } else {
+
+                    resultado.push(
+                        '/api/canal7/proxy?url=' +
+                        encodeURIComponent(
+                            urlAbsoluta
+                        )
+                    );
+                }
+            }
+
+            return resultado.join('\n');
+
+        } catch (error) {
+
+            console.log(
+                'Canal 7 intento',
+                intento,
+                'error:',
+                error.message
+            );
         }
-
-        return resultado.join('\n');
-
-    } catch (error) {
-
-        console.log(
-            '======================================'
-        );
-
-        console.log(
-            'ERROR CANAL 7'
-        );
-
-        console.log(
-            'Mensaje:',
-            error.message
-        );
-
-        console.log(
-            'URL:',
-            CANAL7_STREAM_URL
-        );
-
-        console.log(
-            '======================================'
-        );
-
-        throw error;
     }
+
+    throw new Error(
+        'CloudFront rechazó los 3 intentos'
+    );
 }
 
 // ======================================================
@@ -841,8 +900,20 @@ app.get(
                         httpsAgent:
                             httpsAgent,
 
-                        headers:
-                            CANAL7_HEADERS,
+                        headers: {
+
+                            'User-Agent':
+                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+
+                            'Accept':
+                                'application/vnd.apple.mpegurl, application/x-mpegURL, */*',
+
+                            'Referer':
+                                'https://www.antena7.com.do/',
+
+                            'Origin':
+                                'https://www.antena7.com.do'
+                        },
 
                         timeout: 20000,
 
@@ -949,7 +1020,7 @@ app.get(
 );
 
 // ======================================================
-// CANAL 7 - PROXY DE SEGMENTOS
+// CANAL 7 - PROXY
 // ======================================================
 
 app.get(
@@ -978,10 +1049,24 @@ app.get(
                         httpsAgent:
                             httpsAgent,
 
-                        headers:
-                            CANAL7_HEADERS,
+                        headers: {
+
+                            'User-Agent':
+                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+
+                            'Accept':
+                                '*/*',
+
+                            'Referer':
+                                'https://www.antena7.com.do/',
+
+                            'Origin':
+                                'https://www.antena7.com.do'
+                        },
 
                         timeout: 30000,
+
+                        maxRedirects: 10,
 
                         validateStatus:
                             () => true
@@ -1044,15 +1129,7 @@ app.get(
         try {
 
             console.log(
-                '======================================'
-            );
-
-            console.log(
-                'SOLICITUD CANAL 7'
-            );
-
-            console.log(
-                '======================================'
+                'Solicitud recibida para Canal 7'
             );
 
             const playlist =
