@@ -261,14 +261,13 @@ app.get('/api/canal6', async (req, res) => {
 });
 
 // ======================================================
-// CANAL 7 (ANTENA 7 / CLOUDFRONT)
+// CANAL 7 (ANTENA 7 / CLOUDFRONT - DIRECT MEDIA PLAYLIST)
 // ======================================================
-const CANAL7_MASTER = 'https://d3gie3ig6argu.cloudfront.net/ts:abr.m3u8';
-const CANAL7_BASE = 'https://d3gie3ig6argu.cloudfront.net/';
+const CANAL7_DIRECT_URL = 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
 
 async function obtenerPlaylistCanal7() {
-    // 1. Obtener Master Playlist de CloudFront
-    const masterRes = await axios.get(CANAL7_MASTER, {
+    // Pide la media playlist de segmentos de video directamente
+    const response = await axios.get(CANAL7_DIRECT_URL, {
         httpsAgent: httpsAgent,
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -279,42 +278,17 @@ async function obtenerPlaylistCanal7() {
         timeout: 20000
     });
 
-    const masterLines = masterRes.data.split(/\r?\n/);
-    let subPlaylistUrl = null;
-
-    // Buscar la sub-playlist interna dentro del archivo master
-    for (const line of masterLines) {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('#')) {
-            subPlaylistUrl = new URL(trimmed, CANAL7_BASE).href;
-            break;
-        }
-    }
-
-    const targetUrl = subPlaylistUrl || CANAL7_MASTER;
-
-    // 2. Obtener la sub-playlist que contiene los segmentos .ts
-    const subRes = await axios.get(targetUrl, {
-        httpsAgent: httpsAgent,
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-            'Origin': 'https://www.antena7.com.do',
-            'Referer': 'https://www.antena7.com.do/'
-        },
-        timeout: 20000
-    });
-
-    const lineas = subRes.data.split(/\r?\n/);
+    const baseUrl = new URL(CANAL7_DIRECT_URL);
+    const lineas = response.data.split(/\r?\n/);
     const resultado = [];
 
-    // 3. Convertir cada URL de segmento .ts hacia el proxy local
+    // Convierte cada segmento .ts a una URL relativa de tu proxy
     for (const linea of lineas) {
         const texto = linea.trim();
         if (!texto) { resultado.push(''); continue; }
         if (texto.startsWith('#')) { resultado.push(texto); continue; }
 
-        const urlSegmento = new URL(texto, targetUrl).href;
+        const urlSegmento = new URL(texto, baseUrl).href;
         resultado.push('/api/canal7/proxy?url=' + encodeURIComponent(urlSegmento));
     }
 
