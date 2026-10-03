@@ -44,7 +44,7 @@ const CANALES_JSON = process.env.CANALES_JSON || 'https://raw.githubusercontent.
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 /* =========================================================
-   FUENTES DIRECTAS ESTABLES (SIN TOKENS EXPIRABLES)
+   FUENTES DIRECTAS ESTABLES
 ========================================================= */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL  = process.env.CANAL6_STREAM_URL  || 'https://stream.elseis.do/canal6/master.m3u8';
@@ -53,7 +53,7 @@ const CANAL8_STREAM_URL  = process.env.CANAL8_STREAM_URL  || 'http://190.122.104
 const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabierta.net/hls/010.m3u8';
 
 /* =========================================================
-   IDENTIFICADORES DAILYMOTION (EXTRACCIÓN DINÁMICA 100% ACTIVA)
+   IDENTIFICADORES DAILYMOTION (EXTRACCIÓN DINÁMICA)
 ========================================================= */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
 const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
@@ -135,7 +135,7 @@ function validarParametrosProxy(req, res) {
 /* =========================================================
    EXTRACTOR AUTOMÁTICO DE DAILYMOTION
 ========================================================= */
-const DM_CACHE_MS = 15 * 1000; // Caché ultra corto de 15 segundos para refresco continuo de tokens
+const DM_CACHE_MS = 10 * 1000;
 const dmCache = new Map();
 
 async function extraerStreamDailymotion(videoId) {
@@ -149,7 +149,7 @@ async function extraerStreamDailymotion(videoId) {
         const respuesta = await axios.get(metadataUrl, {
             httpAgent: agenteHttp,
             httpsAgent: agenteSeguro,
-            timeout: 6000,
+            timeout: 5000,
             headers: {
                 'User-Agent': USER_AGENT,
                 'Referer': `https://www.dailymotion.com/embed/video/${videoId}`
@@ -166,7 +166,25 @@ async function extraerStreamDailymotion(videoId) {
             }
         }
     } catch (e) {
-        console.error(`[Dailymotion Extractor Error] Video ID ${videoId}:`, e.message);
+        console.warn(`[Dailymotion Player API] Falló para ${videoId}, intentando API REST...`);
+    }
+
+    try {
+        const apiUrl = `https://api.dailymotion.com/video/${videoId}?fields=stream_hls_url`;
+        const respuesta = await axios.get(apiUrl, {
+            httpAgent: agenteHttp,
+            httpsAgent: agenteSeguro,
+            timeout: 5000,
+            headers: { 'User-Agent': USER_AGENT }
+        });
+
+        if (respuesta.data?.stream_hls_url) {
+            const streamUrl = respuesta.data.stream_hls_url;
+            dmCache.set(cacheKey, { url: streamUrl, expira: ahora + DM_CACHE_MS });
+            return streamUrl;
+        }
+    } catch (e) {
+        console.error(`[Dailymotion REST API Error] ID ${videoId}:`, e.message);
     }
 
     return null;
