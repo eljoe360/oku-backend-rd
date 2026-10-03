@@ -5,13 +5,13 @@ const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Agente HTTPS para omitir restricciones SSL/TLS si aplican
+// Agente HTTPS para omitir restricciones de certificados SSL/TLS si aplican
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
     keepAlive: true
 });
 
-// Habilitar CORS global para Roku
+// Habilitar CORS global para clientes Roku
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -73,7 +73,7 @@ async function obtenerStreamTelemicro() {
     let cookies = '';
     try {
         const pagina = await axios.get('https://telemicro.com.do/telemicro-en-vivo/', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
             timeout: 20000
         });
 
@@ -86,7 +86,7 @@ async function obtenerStreamTelemicro() {
 
     const playlistRes = await axios.get(TELEMICRO_PLAYLIST, {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Referer': 'https://telemicro.com.do/',
             'Accept': '*/*',
             'Cookie': cookies
@@ -114,7 +114,7 @@ async function obtenerPlaylistTelemicro() {
     const datos = await obtenerStreamTelemicro();
     const response = await axios.get(datos.streamUrl, {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Referer': 'https://telemicro.com.do/',
             'Accept': '*/*',
             'Cookie': datos.cookies
@@ -147,7 +147,7 @@ app.get('/api/telemicro/proxy', async (req, res) => {
         const response = await axios.get(url, {
             responseType: 'arraybuffer',
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Referer': 'https://telemicro.com.do/',
                 'Accept': '*/*',
                 'Cookie': cookie
@@ -183,7 +183,7 @@ const CANAL6_STREAM_URL = 'https://stream.elseis.do/canal6/live_480.m3u8';
 async function obtenerPlaylistCanal6() {
     const response = await axios.get(CANAL6_STREAM_URL, {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept': '*/*',
             'Referer': 'https://elseis.do/'
         },
@@ -214,7 +214,7 @@ app.get('/api/canal6/proxy', async (req, res) => {
         const response = await axios.get(url, {
             responseType: 'arraybuffer',
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept': '*/*',
                 'Referer': 'https://elseis.do/'
             },
@@ -241,12 +241,57 @@ app.get('/api/canal6', async (req, res) => {
 });
 
 // ======================================================
-// CANAL 7 (ANTENA 7 - STREAM DIRECTO PERMANENTE)
+// CANAL 7 (ANTENA 7 - EXTRACCIÓN DINÁMICA + CLOUDFRONT PROXY)
 // ======================================================
-const CANAL7_STREAM_URL = 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
+const CANAL7_FALLBACK_URL = 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
+
+async function extraerUrlCanal7() {
+    try {
+        const webRes = await axios.get('https://www.antena7.com.do/envivo-canal-7/', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            },
+            timeout: 15000
+        });
+
+        const html = webRes.data;
+        // Buscar iframe o fuente m3u8 directa en la página
+        const m3u8Match = html.match(/https?:\/\/[^"'\s>]+\.cloudfront\.net\/[^"'\s>]+\.m3u8(?:\?[^"'\s>]+)?/i) ||
+                          html.match(/https?:\/\/[^"'\s>]+\.m3u8(?:\?[^"'\s>]+)?/i);
+
+        if (m3u8Match && m3u8Match[0]) {
+            return m3u8Match[0];
+        }
+
+        // Si hay un iframe de transmisión, obtenerlo
+        const iframeMatch = html.match(/src=["'](https?:\/\/[^"']*(?:stream|live|embed)[^"']*)["']/i);
+        if (iframeMatch && iframeMatch[1]) {
+            const iframeRes = await axios.get(iframeMatch[1], {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Referer': 'https://www.antena7.com.do/'
+                },
+                timeout: 15000
+            });
+
+            const streamMatch = iframeRes.data.match(/https?:\/\/[^"'\s>]+\.m3u8(?:\?[^"'\s>]+)?/i);
+            if (streamMatch && streamMatch[0]) {
+                return streamMatch[0];
+            }
+        }
+    } catch (e) {
+        console.log('Error extrayendo dinámicamente Canal 7:', e.message);
+    }
+
+    // Si falla el scraping, usar la URL estática
+    return CANAL7_FALLBACK_URL;
+}
 
 async function obtenerPlaylistCanal7() {
-    const response = await axios.get(CANAL7_STREAM_URL, {
+    const targetUrl = await extraerUrlCanal7();
+    
+    const response = await axios.get(targetUrl, {
         httpsAgent: httpsAgent,
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -257,7 +302,7 @@ async function obtenerPlaylistCanal7() {
         timeout: 20000
     });
 
-    const baseUrl = new URL(CANAL7_STREAM_URL);
+    const baseUrl = new URL(targetUrl);
     const lineas = response.data.split(/\r?\n/);
     const resultado = [];
 
@@ -266,12 +311,57 @@ async function obtenerPlaylistCanal7() {
         if (!texto) { resultado.push(''); continue; }
         if (texto.startsWith('#')) { resultado.push(texto); continue; }
 
-        const urlSegmentoAbsoluta = new URL(texto, baseUrl).href;
-        resultado.push('/api/canal7/proxy?url=' + encodeURIComponent(urlSegmentoAbsoluta));
+        const urlAbsoluta = new URL(texto, baseUrl).href;
+        
+        // Si el M3U8 es una lista máster que apunta a otras listas .m3u8, redirigimos internamente
+        if (texto.includes('.m3u8')) {
+            resultado.push('/api/canal7/subplaylist?url=' + encodeURIComponent(urlAbsoluta));
+        } else {
+            // Segmentos .ts pasados directamente por el proxy
+            resultado.push('/api/canal7/proxy?url=' + encodeURIComponent(urlAbsoluta));
+        }
     }
 
     return resultado.join('\n');
 }
+
+app.get('/api/canal7/subplaylist', async (req, res) => {
+    try {
+        const subUrl = req.query.url;
+        if (!subUrl) return res.status(400).send('Falta URL');
+
+        const response = await axios.get(subUrl, {
+            httpsAgent: httpsAgent,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Origin': 'https://www.antena7.com.do',
+                'Referer': 'https://www.antena7.com.do/'
+            },
+            timeout: 20000
+        });
+
+        const baseUrl = new URL(subUrl);
+        const lineas = response.data.split(/\r?\n/);
+        const resultado = [];
+
+        for (const linea of lineas) {
+            const texto = linea.trim();
+            if (!texto) { resultado.push(''); continue; }
+            if (texto.startsWith('#')) { resultado.push(texto); continue; }
+
+            const urlSegmento = new URL(texto, baseUrl).href;
+            resultado.push('/api/canal7/proxy?url=' + encodeURIComponent(urlSegmento));
+        }
+
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        return res.send(resultado.join('\n'));
+    } catch (error) {
+        console.log('Error subplaylist Canal 7:', error.message);
+        return res.status(502).send('Error subplaylist Canal 7');
+    }
+});
 
 app.get('/api/canal7/proxy', async (req, res) => {
     try {
