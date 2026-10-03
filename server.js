@@ -304,7 +304,6 @@ app.get(
             );
 
 
-            // CORREGIDO: Se envía el buffer directamente sin envolverlo nuevamente en Buffer.from
             return res.send(
                 response.data
             );
@@ -596,7 +595,6 @@ app.get(
             );
 
 
-            // CORREGIDO: Se envía el buffer de video directamente
             return res.send(
                 response.data
             );
@@ -675,8 +673,6 @@ app.get(
 // CANAL 7
 // ======================================================
 
-// ESTA ES LA URL QUE CONFIRMASTE QUE FUNCIONA
-
 const CANAL7_MASTER =
     'https://d3gie3ig6argu.cloudfront.net/ts:abr.m3u8';
 
@@ -699,7 +695,6 @@ async function obtenerPlaylistCanal7() {
         await axios.get(
             CANAL7_MASTER,
             {
-                // CORREGIDO: Se especifica tipo de respuesta texto explícito
                 responseType:
                     'text',
 
@@ -709,6 +704,12 @@ async function obtenerPlaylistCanal7() {
 
                     'Accept':
                         '*/*',
+
+                    'Origin':
+                        'https://teleantillas.com.do',
+
+                    'Referer':
+                        'https://teleantillas.com.do/',
 
                     'Accept-Language':
                         'es-DO,es;q=0.9,en;q=0.8'
@@ -743,7 +744,6 @@ async function obtenerPlaylistCanal7() {
     }
 
 
-    // CORREGIDO: response.data ya es un string gracias a responseType: 'text'
     const playlist =
         response.data;
 
@@ -855,6 +855,12 @@ app.get(
                             'Accept':
                                 '*/*',
 
+                            'Origin':
+                                'https://teleantillas.com.do',
+
+                            'Referer':
+                                'https://teleantillas.com.do/',
+
                             'Accept-Language':
                                 'es-DO,es;q=0.9,en;q=0.8'
                         },
@@ -897,7 +903,7 @@ app.get(
 
 
             // ==========================================
-            // PLAYLIST M3U8
+            // PLAYLIST M3U8 (Sub-playlist o Chunklist)
             // ==========================================
 
             if (
@@ -977,7 +983,7 @@ app.get(
 
 
             // ==========================================
-            // SEGMENTO TS
+            // SEGMENTO TS (Video)
             // ==========================================
 
             res.setHeader(
@@ -997,7 +1003,6 @@ app.get(
             );
 
 
-            // CORREGIDO: Se envía el buffer de video directamente sin reconvertir
             return res.send(
                 response.data
             );
@@ -1121,7 +1126,6 @@ app.get(
                 );
 
 
-            // CORREGIDO: Construcción dinámica de la URL basándose en el servidor actual
             const protocol =
                 req.headers['x-forwarded-proto'] || req.protocol;
 
