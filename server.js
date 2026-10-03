@@ -47,8 +47,8 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
 
-/* CANAL 7 - ANTENA 7 (NUEVA URL CLOUDFRONT) */
-const CANAL7_STREAM_URL = process.env.CANAL7_STREAM_URL || 'https://d3gie3ig6argu.cloudfront.net/medialist_15609871089997455276_hls.m3u8';
+/* CANAL 7 - ANTENA 7 (SEÑAL TV ABIERTA ESTABLE) */
+const CANAL7_STREAM_URL = process.env.CANAL7_STREAM_URL || 'https://hls.tvabierta.net/hls/007.m3u8';
 
 /* CANAL 8 - TELEMEDIOS */
 const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
@@ -320,7 +320,7 @@ app.get('/api/canal6', async (req, res) => {
     await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
 });
 
-/* CANAL 7 - ANTENA 7 (VIA CLOUDFRONT) */
+/* CANAL 7 - ANTENA 7 (TV ABIERTA HLS) */
 app.get('/api/canal7', async (req, res) => {
     await procesarPlaylistProxy(CANAL7_STREAM_URL, req, res);
 });
