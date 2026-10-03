@@ -1,13 +1,14 @@
 const express = require('express');
 const axios = require('axios');
 const https = require('https');
+const http = require('http');
 const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 /* =========================================================
-   CONFIGURACIÓN
+   CONFIGURACIÓN Y MIDDLEWARES
 ========================================================= */
 app.set('trust proxy', true);
 app.disable('x-powered-by');
@@ -27,11 +28,13 @@ const INSECURE_TLS_HOSTS = (process.env.INSECURE_TLS_HOSTS || 'live2.telemicro.c
 
 const agenteSeguro = new https.Agent({ keepAlive: true, maxSockets: 100 });
 const agenteInseguro = new https.Agent({ rejectUnauthorized: false, keepAlive: true, maxSockets: 50 });
+const agenteHttp = new http.Agent({ keepAlive: true, maxSockets: 100 });
 
 function agenteParaUrl(urlStr) {
     try {
-        const host = new URL(urlStr).hostname.toLowerCase();
-        return INSECURE_TLS_HOSTS.includes(host) ? agenteInseguro : agenteSeguro;
+        const u = new URL(urlStr);
+        if (u.protocol === 'http:') return agenteHttp;
+        return INSECURE_TLS_HOSTS.includes(u.hostname.toLowerCase()) ? agenteInseguro : agenteSeguro;
     } catch {
         return agenteSeguro;
     }
@@ -40,12 +43,13 @@ function agenteParaUrl(urlStr) {
 const CANALES_JSON = process.env.CANALES_JSON || 'https://raw.githubusercontent.com/eljoe360/channels.roku/main/channels.json';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
-/* CONFIGURACIÓN DE CANALES */
+/* CONFIGURACIÓN DE URLS DE CANALES */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL = process.env.CANAL6_STREAM_URL || 'https://stream.elseis.do/canal6/master.m3u8';
-
-/* CANAL 9 - COLOR VISIÓN (DAILYMOTION) */
+const CANAL7_ANTMEDIA_URL = process.env.CANAL7_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/sitv2000038941.ts';
+const CANAL8_STREAM_URL = process.env.CANAL8_STREAM_URL || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 const CANAL9_VIDEO_ID = process.env.CANAL9_VIDEO_ID || 'x7gy059';
+const WINDTVO_API_URL = 'http://198.244.227.59:88/ttl_api_channel.php';
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -121,9 +125,36 @@ function validarParametrosProxy(req, res) {
 }
 
 /* =========================================================
-   EXTRACTOR DINÁMICO DE DAILYMOTION (CANAL 9)
+   EXTRACTOR WINDTVO (CANALES 11 Y 13)
 ========================================================= */
-const DM_CACHE_MS = 20 * 1000; // Caché corta para evitar URLs caducadas
+async function obtenerStreamWindTVO(channelId) {
+    try {
+        const bodyData = new URLSearchParams({ channel_id: channelId }).toString();
+        const respuesta = await axios.post(WINDTVO_API_URL, bodyData, {
+            httpAgent: agenteHttp,
+            timeout: 8000,
+            headers: {
+                'Host': 'lb.windtvo.do:88',
+                'User-Agent': USER_AGENT,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+
+        if (typeof respuesta.data === 'string' && respuesta.data.includes('.m3u8')) {
+            return respuesta.data.trim();
+        } else if (respuesta.data?.url) {
+            return respuesta.data.url;
+        }
+    } catch (e) {
+        console.error(`[WindTVO Error] Canal ${channelId}:`, e.message);
+    }
+    return null;
+}
+
+/* =========================================================
+   EXTRACTOR DAILYMOTION (CANAL 9)
+========================================================= */
+const DM_CACHE_MS = 20 * 1000;
 const dmCache = new Map();
 
 async function extraerStreamDailymotion(videoId) {
@@ -134,6 +165,7 @@ async function extraerStreamDailymotion(videoId) {
     try {
         const metadataUrl = `https://www.dailymotion.com/player/metadata/video/${videoId}`;
         const respuesta = await axios.get(metadataUrl, {
+            httpAgent: agenteHttp,
             httpsAgent: agenteSeguro,
             timeout: 6000,
             headers: {
@@ -169,6 +201,7 @@ async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
         }
 
         const respuesta = await axios.get(streamUrl, {
+            httpAgent: agenteParaUrl(streamUrl),
             httpsAgent: agenteParaUrl(streamUrl),
             timeout: 10000,
             responseType: 'text',
@@ -223,6 +256,7 @@ app.get('/api/proxy/segment', async (req, res) => {
         }
 
         const respuesta = await axios.get(params.url, {
+            httpAgent: agenteParaUrl(params.url),
             httpsAgent: agenteParaUrl(params.url),
             timeout: 15000,
             responseType: 'stream',
@@ -250,7 +284,11 @@ app.get('/api/canales', async (req, res) => {
         const resultado = canales.map(canal => {
             if (canal.telemicro_web) return { ...canal, url: `${baseUrl}/api/telemicro` };
             if (canal.canal6_web) return { ...canal, url: `${baseUrl}/api/canal6` };
+            if (canal.canal7_web) return { ...canal, url: `${baseUrl}/api/canal7` };
+            if (canal.canal8_web) return { ...canal, url: `${baseUrl}/api/canal8` };
             if (canal.canal9_web) return { ...canal, url: `${baseUrl}/api/canal9` };
+            if (canal.canal11_web) return { ...canal, url: `${baseUrl}/api/canal11` };
+            if (canal.canal13_web) return { ...canal, url: `${baseUrl}/api/canal13` };
             return canal;
         });
 
@@ -268,10 +306,49 @@ app.get('/api/canal6', async (req, res) => {
     await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
 });
 
+app.get('/api/canal7', async (req, res) => {
+    try {
+        const respuesta = await axios.get(CANAL7_ANTMEDIA_URL, {
+            httpAgent: agenteHttp,
+            timeout: 12000,
+            responseType: 'stream',
+            headers: { 'User-Agent': USER_AGENT }
+        });
+
+        res.setHeader('Content-Type', 'video/mp2t');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        respuesta.data.pipe(res);
+
+        respuesta.data.on('error', (err) => {
+            console.error('[Canal 7 Stream Error]:', err.message);
+            if (!res.headersSent) res.status(502).send('Error de señal');
+        });
+    } catch (error) {
+        console.error('[Canal 7 Connection Error]:', error.message);
+        res.status(503).send('Sin señal Canal 7');
+    }
+});
+
+app.get('/api/canal8', async (req, res) => {
+    await procesarPlaylistProxy(CANAL8_STREAM_URL, req, res);
+});
+
 app.get('/api/canal9', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
     if (!streamUrl) return res.status(503).send('Sin señal Canal 9');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
+});
+
+app.get('/api/canal11', async (req, res) => {
+    const streamUrl = await obtenerStreamWindTVO('11');
+    if (!streamUrl) return res.status(503).send('Sin señal Canal 11');
+    await procesarPlaylistProxy(streamUrl, req, res, 'http://lb.windtvo.do:88/');
+});
+
+app.get('/api/canal13', async (req, res) => {
+    const streamUrl = await obtenerStreamWindTVO('13');
+    if (!streamUrl) return res.status(503).send('Sin señal Canal 13');
+    await procesarPlaylistProxy(streamUrl, req, res, 'http://lb.windtvo.do:88/');
 });
 
 app.get('/', (req, res) => res.send('ROKU Backend RD OK'));
