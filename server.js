@@ -54,11 +54,13 @@ const CANAL8_STREAM_URL  = process.env.CANAL8_STREAM_URL  || 'http://190.122.104
 const CANAL9_STREAM_URL  = process.env.CANAL9_STREAM_URL  || 'https://hls.tvabierta.net/hls/009.m3u8';
 const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabierta.net/hls/010.m3u8';
 const CANAL11_STREAM_URL = process.env.CANAL11_STREAM_URL || 'https://hls.tvabierta.net/hls/011.m3u8';
+const CANAL12_STREAM_URL = process.env.CANAL12_STREAM_URL || 'https://hls.tvabierta.net/hls/012.m3u8';
 const CANAL13_STREAM_URL = process.env.CANAL13_STREAM_URL || 'https://live2.telemicro.com.do/live/telecentrocast_1080p/chunks.m3u8';
 const CANAL15_STREAM_URL = process.env.CANAL15_STREAM_URL || 'https://live4.telemicro.com.do/live/digital15cast_1080p/chunks.m3u8';
 const CANAL18_STREAM_URL = process.env.CANAL18_STREAM_URL || 'https://ss2.tvrdomi.com:1936/ame47/ame47/playlist.m3u8';
 const CANAL19_STREAM_URL = process.env.CANAL19_STREAM_URL || 'https://5790d294af2dc.streamlock.net/tvhdlive/tvhdlive/playlist.m3u8';
 const CANAL21_STREAM_URL = process.env.CANAL21_STREAM_URL || 'https://hls.tvabierta.net/hls/021.m3u8';
+const CANAL23_STREAM_URL = process.env.CANAL23_STREAM_URL || 'https://hls.tvabierta.net/hls/023.m3u8';
 
 /* IDENTIFICADORES DAILYMOTION */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
@@ -377,7 +379,7 @@ app.get('/', async (req, res) => {
 });
 
 /* =========================================================
-   ENDPOINTS CON SISTEMA DE RESPALDO INTELIGENTE (DAILYMOTION <-> DIRECTO)
+   ENDPOINTS CON SISTEMA DE RESPALDO (DAILYMOTION -> TVABIERTA)
 ========================================================= */
 
 app.get('/api/telemicro', async (req, res) => {
@@ -400,7 +402,7 @@ app.get('/api/canal8', async (req, res) => {
     if (!exito) res.status(500).send('Error en la señal');
 });
 
-/* CANAL 9: Daily -> Directo (009) */
+/* CANAL 9 */
 app.get('/api/canal9', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
@@ -413,7 +415,7 @@ app.get('/api/canal10', async (req, res) => {
     if (!exito) res.status(500).send('Error en la señal');
 });
 
-/* CANAL 11: Daily -> Directo (011) */
+/* CANAL 11 */
 app.get('/api/canal11', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL11_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
@@ -421,10 +423,11 @@ app.get('/api/canal11', async (req, res) => {
     res.status(503).send('Señal no disponible para Canal 11');
 });
 
-/* CANAL 12: Daily -> Respaldo directo de TVAbierta (012 o similar si aplica) */
+/* CANAL 12 */
 app.get('/api/canal12', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL12_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
+    if (await procesarPlaylistProxy(CANAL12_STREAM_URL, req, res)) return;
     res.status(503).send('Señal no disponible para Canal 12');
 });
 
@@ -453,10 +456,11 @@ app.get('/api/canal21', async (req, res) => {
     if (!exito) res.status(500).send('Error en la señal');
 });
 
-/* CANAL 23: Daily -> Respaldo directo */
+/* CANAL 23 */
 app.get('/api/canal23', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL23_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
+    if (await procesarPlaylistProxy(CANAL23_STREAM_URL, req, res)) return;
     res.status(503).send('Señal no disponible para Canal 23');
 });
 
