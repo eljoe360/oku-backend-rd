@@ -12,15 +12,13 @@ app.get('/', (req, res) => {
 
 app.get('/live/telesistema', async (req, res) => {
   console.log('Iniciando extracción de Telesistema...');
-  
-  // Apuntamos a la sección directa donde está el reproductor en vivo
-  const urlCanal = 'https://telesistema11.com.do/en-vivo';
+  const urlCanal = 'https://telesistema11.com.do/';
   
   try {
     const streamUrl = await obtenerUrlCanal(urlCanal);
 
     if (streamUrl) {
-      console.log('Redirigiendo a:', streamUrl);
+      console.log('Redirigiendo a transmisión:', streamUrl);
       res.redirect(streamUrl);
     } else {
       res.status(500).json({ error: 'No se pudo capturar el enlace M3U8.' });
