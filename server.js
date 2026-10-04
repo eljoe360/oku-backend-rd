@@ -155,7 +155,7 @@ async function extraerStreamDailymotion(videoId) {
         const respuesta = await axios.get(metadataUrl, {
             httpAgent: agenteHttp,
             httpsAgent: agenteSeguro,
-            timeout: 5000,
+            timeout: 6000,
             headers: {
                 'User-Agent': USER_AGENT,
                 'Referer': `https://www.dailymotion.com/embed/video/${videoId}`
@@ -172,7 +172,35 @@ async function extraerStreamDailymotion(videoId) {
             }
         }
     } catch (e) {
-        console.warn(`[Dailymotion Player API] Falló para ${videoId}, intentando API REST...`);
+        console.warn(`[Dailymotion Player API] Falló para ${videoId}, usando scraper de respaldo...`);
+    }
+
+    try {
+        const embedUrl = `https://www.dailymotion.com/embed/video/${videoId}`;
+        const respuestaHTML = await axios.get(embedUrl, {
+            httpAgent: agenteHttp,
+            httpsAgent: agenteSeguro,
+            timeout: 6000,
+            headers: { 'User-Agent': USER_AGENT }
+        });
+
+        const match = respuestaHTML.data.match(/var\s+config\s*=\s*(\{.*?\});/s) || 
+                      respuestaHTML.data.match(/window\.__PLAYER_CONFIG__\s*=\s*(\{.*?\});/s);
+
+        if (match && match[1]) {
+            const configData = JSON.parse(match[1]);
+            const qualities = configData?.metadata?.qualities;
+            if (qualities) {
+                const autoList = qualities.auto || Object.values(qualities).flat();
+                const videoStream = autoList.find(q => q.url && q.url.includes('.m3u8'));
+                if (videoStream?.url) {
+                    dmCache.set(cacheKey, { url: videoStream.url, expira: ahora + DM_CACHE_MS });
+                    return videoStream.url;
+                }
+            }
+        }
+    } catch (e) {
+        console.error(`[Dailymotion Scraper Error] ID ${videoId}:`, e.message);
     }
 
     try {
