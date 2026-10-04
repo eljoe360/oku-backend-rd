@@ -6,12 +6,12 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Ruta raíz (evita el mensaje "Cannot GET /")
+// Ruta raíz
 app.get('/', (req, res) => {
   res.send('Servidor activo y listo para extraer enlaces.');
 });
 
-// Ruta de extracción para Telesistema
+// Ruta dinámica para extraer y redirigir al flujo M3U8 de Telesistema
 app.get('/live/telesistema', async (req, res) => {
   console.log('Obteniendo señal de Telesistema...');
   const urlCanal = 'https://telesistema11.com.do/';
