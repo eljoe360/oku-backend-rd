@@ -61,6 +61,7 @@ const CANAL18_STREAM_URL = process.env.CANAL18_STREAM_URL || 'https://ss2.tvrdom
 const CANAL19_STREAM_URL = process.env.CANAL19_STREAM_URL || 'https://5790d294af2dc.streamlock.net/tvhdlive/tvhdlive/playlist.m3u8';
 const CANAL21_STREAM_URL = process.env.CANAL21_STREAM_URL || 'https://hls.tvabierta.net/hls/021.m3u8';
 const CANAL23_STREAM_URL = process.env.CANAL23_STREAM_URL || 'https://hls.tvabierta.net/hls/023.m3u8';
+const CANAL27_STREAM_URL = process.env.CANAL27_STREAM_URL || 'https://c.streamhoster.com/link/hls/W3s3kC/iuubLO3sAC5/mwuF5Xskck9_5/playlist.m3u8';
 
 /* IDENTIFICADORES DAILYMOTION */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
@@ -329,7 +330,7 @@ app.get('/api/deportes', async (req, res) => {
 });
 
 /* =========================================================
-   RUTAS DE LOS CANALES Y CATÁLOGOS (CON RESPALDO AUTOMÁTICO TVABIERTA)
+   RUTAS DE LOS CANALES Y CATÁLOGOS
 ========================================================= */
 async function obtenerListaCanalesProcesada(req) {
     const baseUrl = obtenerBaseUrl(req);
@@ -340,15 +341,12 @@ async function obtenerListaCanalesProcesada(req) {
         return canales.map(canal => {
             let targetUrl = canal.url;
 
-            // 1. Intentar buscar si tiene configurado un endpoint backend (ej: canal2_web, telemicro_web)
             const claveWeb = Object.keys(canal).find(k => k.endsWith('_web') && canal[k]);
             if (claveWeb) {
                 const nombreApi = claveWeb.replace('_web', '');
                 targetUrl = `${baseUrl}/api/${nombreApi}`;
             }
 
-            // 2. Si no tiene url o el backend falla, aplicar automáticamente el respaldo de tvabierta
-            // formateando el número a 3 dígitos (ej: 9 -> 009, 11 -> 011)
             if (!targetUrl && canal.numero) {
                 const numeroFormateado = String(canal.numero).padStart(3, '0');
                 targetUrl = `https://hls.tvabierta.net/hls/${numeroFormateado}.m3u8`;
@@ -381,7 +379,7 @@ app.get('/', async (req, res) => {
 });
 
 /* =========================================================
-   ENDPOINTS CON SISTEMA DE RESPALDO (DAILYMOTION -> TVABIERTA)
+   ENDPOINTS DE CANALES
 ========================================================= */
 
 app.get('/api/telemicro', async (req, res) => {
@@ -404,7 +402,6 @@ app.get('/api/canal8', async (req, res) => {
     if (!exito) res.status(500).send('Error en la señal');
 });
 
-/* CANAL 9 */
 app.get('/api/canal9', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
@@ -417,7 +414,6 @@ app.get('/api/canal10', async (req, res) => {
     if (!exito) res.status(500).send('Error en la señal');
 });
 
-/* CANAL 11 */
 app.get('/api/canal11', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL11_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
@@ -425,7 +421,6 @@ app.get('/api/canal11', async (req, res) => {
     res.status(503).send('Señal no disponible para Canal 11');
 });
 
-/* CANAL 12 */
 app.get('/api/canal12', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL12_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
@@ -458,12 +453,17 @@ app.get('/api/canal21', async (req, res) => {
     if (!exito) res.status(500).send('Error en la señal');
 });
 
-/* CANAL 23 */
 app.get('/api/canal23', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL23_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
     if (await procesarPlaylistProxy(CANAL23_STREAM_URL, req, res)) return;
     res.status(503).send('Señal no disponible para Canal 23');
+});
+
+/* NUEVO ENDPOINT PARA EL CANAL 27 */
+app.get('/api/canal27', async (req, res) => {
+    const exito = await procesarPlaylistProxy(CANAL27_STREAM_URL, req, res);
+    if (!exito) res.status(500).send('Error en la señal del Canal 27');
 });
 
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
