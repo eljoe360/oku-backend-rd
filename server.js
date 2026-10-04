@@ -64,6 +64,9 @@ const CANAL23_STREAM_URL = process.env.CANAL23_STREAM_URL || 'https://hls.tvabie
 const CANAL27_STREAM_URL = process.env.CANAL27_STREAM_URL || 'https://2-fss-2.streamhoster.com/pl_138/206532-6829902-1/playlist.m3u8';
 const CANAL27_CHUNK_URL  = process.env.CANAL27_CHUNK_URL  || 'https://2-fss-2.streamhoster.com/pl_138/206532-6829902-1/chunklist.m3u8';
 const CANAL32_STREAM_URL = process.env.CANAL32_STREAM_URL || 'https://edge.livestreaminggroup.info/vtv32live/index.m3u8';
+
+/* CANAL 36 (CDN Deportes) - Enlace extraído de tv.medios.com.do */
+const CANAL36_STREAM_URL = process.env.CANAL36_STREAM_URL || 'https://live.eu-north-1a.cf.dmcdn.net/cdn/live/video/xar1qcu.m3u8';
 const CANAL37_STREAM_URL = process.env.CANAL37_STREAM_URL || 'https://dmxleo.dailymotion.com/cdn/manifest/video/x9lincs.m3u8';
 
 /* IDENTIFICADORES DAILYMOTION */
@@ -71,7 +74,6 @@ const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
 const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
 const CANAL12_VIDEO_ID = process.env.CANAL12_VIDEO_ID || 'xaio352';
 const CANAL23_VIDEO_ID = process.env.CANAL23_VIDEO_ID || 'x9imtbq';
-const CANAL36_VIDEO_ID = process.env.CANAL36_VIDEO_ID || 'xar1qcu';
 const CANAL37_VIDEO_ID = process.env.CANAL37_VIDEO_ID || 'x9lincs';
 
 app.use((req, res, next) => {
@@ -181,12 +183,11 @@ async function extraerStreamDailymotion(videoId) {
             
             if (videoStream?.url) {
                 dmCache.set(cacheKey, { url: videoStream.url, expira: ahora + DM_CACHE_MS });
-                console.log(`[Dailymotion] URL fresca obtenida para ID ${videoId}`);
                 return videoStream.url;
             }
         }
     } catch (e) {
-        console.warn(`[Dailymotion API Warning] ID ${videoId}: ${e.message}`);
+        // Fallback a API REST si falla el reproductor
     }
 
     try {
@@ -204,7 +205,7 @@ async function extraerStreamDailymotion(videoId) {
             return streamUrl;
         }
     } catch (e) {
-        console.error(`[Dailymotion REST Error] ID ${videoId}:`, e.message);
+        // Error silencioso en log
     }
 
     return null;
@@ -474,10 +475,12 @@ app.get('/api/canal32', async (req, res) => {
     if (!exito) res.status(500).send('Error en la señal del Canal 32');
 });
 
+/* =========================================================
+   CANAL 36 (CDN Deportes)
+========================================================= */
 app.get('/api/canal36', async (req, res) => {
-    const streamUrlDm = await extraerStreamDailymotion(CANAL36_VIDEO_ID);
-    if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
-    res.status(503).send('Señal no disponible o expirada para Canal 36');
+    const exito = await procesarPlaylistProxy(CANAL36_STREAM_URL, req, res, 'https://tv.medios.com.do/');
+    if (!exito) res.status(500).send('Error en la señal del Canal 36');
 });
 
 app.get('/api/canal37', async (req, res) => {
