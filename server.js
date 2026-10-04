@@ -52,6 +52,7 @@ const CANAL6_STREAM_URL  = process.env.CANAL6_STREAM_URL  || 'https://stream.els
 const CANAL7_STREAM_URL  = process.env.CANAL7_STREAM_URL  || 'https://hls.tvabierta.net/hls/007.m3u8';
 const CANAL8_STREAM_URL  = process.env.CANAL8_STREAM_URL  || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
 const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabierta.net/hls/010.m3u8';
+const CANAL11_STREAM_URL = process.env.CANAL11_STREAM_URL || 'https://hls.tvabierta.net/hls/011.m3u8';
 const CANAL13_STREAM_URL = process.env.CANAL13_STREAM_URL || 'https://live2.telemicro.com.do/live/telecentrocast_1080p/chunks.m3u8';
 const CANAL15_STREAM_URL = process.env.CANAL15_STREAM_URL || 'https://live4.telemicro.com.do/live/digital15cast_1080p/chunks.m3u8';
 const CANAL18_STREAM_URL = process.env.CANAL18_STREAM_URL || 'https://ss2.tvrdomi.com:1936/ame47/ame47/playlist.m3u8';
@@ -62,7 +63,6 @@ const CANAL21_STREAM_URL = process.env.CANAL21_STREAM_URL || 'https://hls.tvabie
    IDENTIFICADORES DAILYMOTION
 ========================================================= */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
-const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
 const CANAL12_VIDEO_ID = process.env.CANAL12_VIDEO_ID || 'xaio352';
 const CANAL23_VIDEO_ID = process.env.CANAL23_VIDEO_ID || 'x9imtbq';
 
@@ -140,7 +140,7 @@ function validarParametrosProxy(req, res) {
 }
 
 /* =========================================================
-   EXTRACTOR AUTOMÁTICO DE DAILYMOTION (REGENERACIÓN ACTIVA)
+   EXTRACTOR AUTOMÁTICO DE DAILYMOTION
 ========================================================= */
 const DM_CACHE_MS = 10 * 1000;
 const dmCache = new Map();
@@ -407,9 +407,7 @@ app.get('/api/canal10', async (req, res) => {
 });
 
 app.get('/api/canal11', async (req, res) => {
-    const streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Señal no disponible para Canal 11');
-    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
+    await procesarPlaylistProxy(CANAL11_STREAM_URL, req, res);
 });
 
 app.get('/api/canal12', async (req, res) => {
