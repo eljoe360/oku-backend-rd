@@ -1,37 +1,40 @@
 const puppeteer = require('puppeteer');
 
 async function obtenerUrlCanal(urlPagina) {
-  // Iniciamos el navegador en modo headless (sin interfaz visual)
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-
-  const page = await browser.newPage();
-  let streamUrl = null;
-
-  // Escuchamos las peticiones de red que realiza la página
-  page.on('request', request => {
-    const reqUrl = request.url();
-    // Filtramos para capturar archivos de transmisión (.m3u8)
-    if (reqUrl.includes('.m3u8') && !streamUrl) {
-      streamUrl = reqUrl;
-      console.log('¡Enlace extraído con éxito!:', streamUrl);
-    }
-  });
-
+  let browser;
   try {
-    // Navegamos a la URL del canal esperando a que cargue la red
-    await page.goto(urlPagina, { waitUntil: 'networkidle2', timeout: 30000 });
-  } catch (error) {
-    console.error('Error al cargar la página:', error.message);
-  } finally {
-    await browser.close();
-  }
+    browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process'
+      ]
+    });
 
-  return streamUrl;
+    const page = await browser.newPage();
+    let streamUrl = null;
+
+    // Escuchar el tráfico de red para encontrar el manifiesto .m3u8
+    page.on('request', request => {
+      const reqUrl = request.url();
+      if ((reqUrl.includes('.m3u8') || reqUrl.includes('/playlist/')) && !streamUrl) {
+        streamUrl = reqUrl;
+        console.log('¡Enlace M3U8 capturado!:', streamUrl);
+      }
+    });
+
+    await page.goto(urlPagina, { waitUntil: 'networkidle2', timeout: 35000 });
+    return streamUrl;
+  } catch (error) {
+    console.error('Error al extraer el canal:', error.message);
+    return null;
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
 }
 
-// Reemplaza con la URL web del canal que quieras probar
-const canalUrl = 'https://telesistema11.com.do/';
-obtenerUrlCanal(canalUrl);
+module.exports = { obtenerUrlCanal };
