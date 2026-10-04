@@ -7,12 +7,13 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* =========================================================
-   CONFIGURACIÓN Y MIDDLEWARES
-========================================================= */
-
 app.set('trust proxy', true);
 app.disable('x-powered-by');
+
+
+// ============================================================
+// CONFIGURACIÓN GENERAL
+// ============================================================
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
 
@@ -20,21 +21,35 @@ let SECRET = process.env.PROXY_SECRET;
 
 if (!SECRET) {
     SECRET = crypto.randomBytes(32).toString('hex');
-    console.warn('[AVISO] PROXY_SECRET no definido. Se generó uno temporal.');
+    console.warn(
+        '[AVISO] PROXY_SECRET no definido. Se generó uno temporal.'
+    );
 }
+
+
+// ============================================================
+// HOSTS QUE NECESITAN TLS INSEGURO
+// ============================================================
 
 const INSECURE_TLS_HOSTS = (
     process.env.INSECURE_TLS_HOSTS ||
-    'live2.telemicro.com.do,live4.telemicro.com.do,ss2.tvrdomi.com,edge.livestreaminggroup.info,2-fss-2.streamhoster.com,live.eu-north-1a.cf.dmcdn.net'
+    'live2.telemicro.com.do,' +
+    'live4.telemicro.com.do,' +
+    'ss2.tvrdomi.com,' +
+    'edge.livestreaminggroup.info,' +
+    '2-fss-2.streamhoster.com,' +
+    'live.eu-north-1a.cf.dmcdn.net'
 )
     .split(',')
     .map(h => h.trim().toLowerCase())
     .filter(Boolean);
 
+
 const agenteSeguro = new https.Agent({
     keepAlive: true,
     maxSockets: 100
 });
+
 
 const agenteInseguro = new https.Agent({
     rejectUnauthorized: false,
@@ -42,168 +57,212 @@ const agenteInseguro = new https.Agent({
     maxSockets: 50
 });
 
+
 const agenteHttp = new http.Agent({
     keepAlive: true,
     maxSockets: 100
 });
 
+
 function agenteParaUrl(urlStr) {
+
     try {
+
         const u = new URL(urlStr);
 
         if (u.protocol === 'http:') {
             return agenteHttp;
         }
 
-        return INSECURE_TLS_HOSTS.includes(u.hostname.toLowerCase())
+        return INSECURE_TLS_HOSTS.includes(
+            u.hostname.toLowerCase()
+        )
             ? agenteInseguro
             : agenteSeguro;
 
     } catch {
+
         return agenteSeguro;
     }
 }
+
+
+// ============================================================
+// CONFIGURACIÓN DE FUENTES
+// ============================================================
 
 const CANALES_JSON =
     process.env.CANALES_JSON ||
     'https://raw.githubusercontent.com/eljoe360/channels.roku/main/channels.json';
 
+
 const SPORTS_M3U_URL =
     process.env.SPORTS_M3U_URL ||
     'https://iptv-org.github.io/iptv/categories/sports.m3u';
 
+
 const USER_AGENT =
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+    'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+    'Chrome/122.0.0.0 Safari/537.36';
 
 
-/* =========================================================
-   FUENTES DIRECTAS
-========================================================= */
+// ============================================================
+// CANALES
+// ============================================================
 
 const TELEMICRO_PLAYLIST =
     process.env.TELEMICRO_PLAYLIST ||
     'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 
+
 const CANAL6_STREAM_URL =
     process.env.CANAL6_STREAM_URL ||
     'https://stream.elseis.do/canal6/master.m3u8';
+
 
 const CANAL7_STREAM_URL =
     process.env.CANAL7_STREAM_URL ||
     'https://hls.tvabierta.net/hls/007.m3u8';
 
+
 const CANAL8_STREAM_URL =
     process.env.CANAL8_STREAM_URL ||
     'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
+
 
 const CANAL9_STREAM_URL =
     process.env.CANAL9_STREAM_URL ||
     'https://hls.tvabierta.net/hls/009.m3u8';
 
+
 const CANAL10_STREAM_URL =
     process.env.CANAL10_STREAM_URL ||
     'https://hls.tvabierta.net/hls/010.m3u8';
+
 
 const CANAL11_STREAM_URL =
     process.env.CANAL11_STREAM_URL ||
     'https://hls.tvabierta.net/hls/011.m3u8';
 
+
 const CANAL12_STREAM_URL =
     process.env.CANAL12_STREAM_URL ||
     'https://hls.tvabierta.net/hls/012.m3u8';
+
 
 const CANAL13_STREAM_URL =
     process.env.CANAL13_STREAM_URL ||
     'https://live2.telemicro.com.do/live/telecentrocast_1080p/chunks.m3u8';
 
+
 const CANAL15_STREAM_URL =
     process.env.CANAL15_STREAM_URL ||
     'https://live4.telemicro.com.do/live/digital15cast_1080p/chunks.m3u8';
+
 
 const CANAL18_STREAM_URL =
     process.env.CANAL18_STREAM_URL ||
     'https://ss2.tvrdomi.com:1936/ame47/ame47/playlist.m3u8';
 
+
 const CANAL19_STREAM_URL =
     process.env.CANAL19_STREAM_URL ||
     'https://5790d294af2dc.streamlock.net/tvhdlive/tvhdlive/playlist.m3u8';
+
 
 const CANAL21_STREAM_URL =
     process.env.CANAL21_STREAM_URL ||
     'https://hls.tvabierta.net/hls/021.m3u8';
 
+
 const CANAL23_STREAM_URL =
     process.env.CANAL23_STREAM_URL ||
     'https://hls.tvabierta.net/hls/023.m3u8';
+
 
 const CANAL27_STREAM_URL =
     process.env.CANAL27_STREAM_URL ||
     'https://2-fss-2.streamhoster.com/pl_138/206532-6829902-1/playlist.m3u8';
 
+
 const CANAL27_CHUNK_URL =
     process.env.CANAL27_CHUNK_URL ||
     'https://2-fss-2.streamhoster.com/pl_138/206532-6829902-1/chunklist.m3u8';
+
 
 const CANAL32_STREAM_URL =
     process.env.CANAL32_STREAM_URL ||
     'https://edge.livestreaminggroup.info/vtv32live/index.m3u8';
 
 
-/* =========================================================
-   CANAL 36
-   DAILYMOTION DINÁMICO
-========================================================= */
+// ============================================================
+// CANAL 33 - SUPER CANAL
+// ============================================================
 
-/*
-   IMPORTANTE:
-   NO se guarda aquí ningún enlace sec2(...)
-   porque esos enlaces son temporales.
+const CANAL33_STREAM_URL =
+    process.env.CANAL33_STREAM_URL ||
+    'https://cnn.hostlagarto.com/supercanalhd/playlist.m3u8';
 
-   El servidor utilizará únicamente el ID de Dailymotion
-   para intentar obtener una URL nueva.
-*/
+
+// ============================================================
+// CANAL 36 - DAILY MOTION
+// NO SE GUARDA NINGÚN sec2(...) CADUCABLE
+// ============================================================
 
 const CANAL36_VIDEO_ID =
-    process.env.CANAL36_VIDEO_ID || 'xar1qcu';
+    process.env.CANAL36_VIDEO_ID ||
+    'xar1qcu';
 
 
-/* =========================================================
-   CANAL 37
-   DAILYMOTION
-========================================================= */
+// ============================================================
+// CANAL 37
+// ============================================================
 
 const CANAL37_STREAM_URL =
     process.env.CANAL37_STREAM_URL ||
     'https://dmxleo.dailymotion.com/cdn/manifest/video/x9lincs.m3u8';
 
 
-/* =========================================================
-   IDENTIFICADORES DAILYMOTION
-========================================================= */
+// ============================================================
+// IDs DAILY MOTION
+// ============================================================
 
 const CANAL9_VIDEO_ID =
-    process.env.CANAL9_VIDEO_ID || 'x7gy059';
+    process.env.CANAL9_VIDEO_ID ||
+    'x7gy059';
+
 
 const CANAL11_VIDEO_ID =
-    process.env.CANAL11_VIDEO_ID || 'x80ac48';
+    process.env.CANAL11_VIDEO_ID ||
+    'x80ac48';
+
 
 const CANAL12_VIDEO_ID =
-    process.env.CANAL12_VIDEO_ID || 'xaio352';
+    process.env.CANAL12_VIDEO_ID ||
+    'xaio352';
+
 
 const CANAL23_VIDEO_ID =
-    process.env.CANAL23_VIDEO_ID || 'x9imtbq';
+    process.env.CANAL23_VIDEO_ID ||
+    'x9imtbq';
+
 
 const CANAL37_VIDEO_ID =
-    process.env.CANAL37_VIDEO_ID || 'x9lincs';
+    process.env.CANAL37_VIDEO_ID ||
+    'x9lincs';
 
 
-/* =========================================================
-   CORS
-========================================================= */
+// ============================================================
+// CORS
+// ============================================================
 
 app.use((req, res, next) => {
 
-    res.header('Access-Control-Allow-Origin', '*');
+    res.header(
+        'Access-Control-Allow-Origin',
+        '*'
+    );
 
     res.header(
         'Access-Control-Allow-Headers',
@@ -212,7 +271,7 @@ app.use((req, res, next) => {
 
     res.header(
         'Access-Control-Allow-Methods',
-        'GET, HEAD, OPTIONS'
+        'GET,HEAD,OPTIONS'
     );
 
     if (req.method === 'OPTIONS') {
@@ -223,125 +282,74 @@ app.use((req, res, next) => {
 });
 
 
-/* =========================================================
-   RATE LIMITER
-========================================================= */
+// ============================================================
+// RATE LIMIT SIMPLE
+// ============================================================
 
-const LIMITE_VENTANA_MS = 60 * 1000;
-const LIMITE_MAX = 1200;
+const rateMap = new Map();
 
-const contadores = new Map();
+function rateLimit(req, res, next) {
 
-app.use((req, res, next) => {
+    const ip =
+        req.headers['x-forwarded-for'] ||
+        req.socket.remoteAddress ||
+        'unknown';
 
     const ahora = Date.now();
 
-    let c = contadores.get(req.ip);
+    const datos = rateMap.get(ip);
 
-    if (!c || c.reinicio <= ahora) {
+    if (!datos || ahora - datos.time > 60000) {
 
-        c = {
-            cuenta: 0,
-            reinicio: ahora + LIMITE_VENTANA_MS
-        };
+        rateMap.set(ip, {
+            count: 1,
+            time: ahora
+        });
 
-        contadores.set(req.ip, c);
+        return next();
     }
 
-    c.cuenta++;
+    datos.count++;
 
-    if (c.cuenta > LIMITE_MAX) {
-
-        res.setHeader(
-            'Retry-After',
-            Math.ceil((c.reinicio - ahora) / 1000)
-        );
+    if (datos.count > 300) {
 
         return res
             .status(429)
-            .send('Demasiadas peticiones');
+            .send('Demasiadas solicitudes');
     }
 
     next();
-});
-
-
-setInterval(() => {
-
-    const ahora = Date.now();
-
-    for (const [ip, c] of contadores) {
-
-        if (c.reinicio <= ahora) {
-            contadores.delete(ip);
-        }
-    }
-
-}, LIMITE_VENTANA_MS).unref();
-
-
-/* =========================================================
-   UTILIDADES Y FIRMAS HMAC
-========================================================= */
-
-function obtenerBaseUrl(req) {
-
-    if (PUBLIC_URL) {
-        return PUBLIC_URL;
-    }
-
-    const proto =
-        req.headers['x-forwarded-proto'] ||
-        req.protocol;
-
-    const host =
-        req.headers['x-forwarded-host'] ||
-        req.get('host');
-
-    return `${proto}://${host}`;
 }
 
+app.use(rateLimit);
 
-function firmar(url, ref = '') {
+
+// ============================================================
+// HMAC
+// ============================================================
+
+function crearFirma(url, ref = '') {
 
     return crypto
         .createHmac('sha256', SECRET)
-        .update(`${url}\n${ref}`)
+        .update(`${url}|${ref}`)
         .digest('hex');
 }
 
 
-function firmaValida(url, ref = '', sig = '') {
+function comprobarFirma(url, ref, sig) {
 
-    if (!sig) {
+    if (!url || !sig) {
         return false;
     }
 
-    const esperada =
-        Buffer.from(firmar(url, ref));
-
-    const recibida =
-        Buffer.from(String(sig));
-
-    return (
-        esperada.length === recibida.length &&
-        crypto.timingSafeEqual(
-            esperada,
-            recibida
-        )
-    );
-}
-
-
-function urlHttpValida(str) {
+    const esperada = crearFirma(url, ref);
 
     try {
 
-        const u = new URL(str);
-
-        return (
-            u.protocol === 'http:' ||
-            u.protocol === 'https:'
+        return crypto.timingSafeEqual(
+            Buffer.from(esperada),
+            Buffer.from(sig)
         );
 
     } catch {
@@ -351,58 +359,94 @@ function urlHttpValida(str) {
 }
 
 
-function validarParametrosProxy(req, res) {
+// ============================================================
+// AYUDAS M3U8
+// ============================================================
 
-    const {
-        url,
-        ref = '',
-        sig
-    } = req.query;
+function esM3U8(url) {
 
-    if (
-        typeof url !== 'string' ||
-        !url
-    ) {
-
-        res.status(400).send('Falta URL');
-
-        return null;
-    }
-
-    if (!urlHttpValida(url)) {
-
-        res.status(400).send('URL inválida');
-
-        return null;
-    }
-
-    if (!firmaValida(url, ref, sig)) {
-
-        res.status(403).send('Firma inválida');
-
-        return null;
-    }
-
-    return {
-        url,
-        ref
-    };
+    return (
+        typeof url === 'string' &&
+        url &&
+        (
+            url.includes('.m3u8') ||
+            url.includes('/manifest/')
+        )
+    );
 }
 
 
-/* =========================================================
-   EXTRACTOR DAILYMOTION
-========================================================= */
+async function comprobarM3U8(
+    streamUrl,
+    videoId = ''
+) {
 
-/*
-   30 segundos de caché.
+    if (!esM3U8(streamUrl)) {
+        return false;
+    }
 
-   La URL de Dailymotion sigue siendo temporal,
-   pero no necesitamos solicitar una nueva URL
-   para absolutamente cada petición.
-*/
+    try {
 
-const DM_CACHE_MS = 30 * 1000;
+        const respuesta = await axios.get(
+            streamUrl,
+            {
+                httpAgent: agenteParaUrl(streamUrl),
+                httpsAgent: agenteParaUrl(streamUrl),
+
+                timeout: 7000,
+
+                responseType: 'text',
+
+                headers: {
+                    'User-Agent': USER_AGENT,
+
+                    'Referer':
+                        videoId
+                            ? `https://www.dailymotion.com/video/${videoId}`
+                            : undefined
+                },
+
+                validateStatus:
+                    status =>
+                        status >= 200 &&
+                        status < 400
+            }
+        );
+
+
+        const contenido =
+            String(respuesta.data || '');
+
+
+        if (contenido.includes('#EXTM3U')) {
+            return true;
+        }
+
+
+        console.warn(
+            `[M3U8] ${streamUrl} respondió sin #EXTM3U`
+        );
+
+        return false;
+
+    } catch (e) {
+
+        console.warn(
+            `[M3U8] No se pudo verificar: ${e.message}`
+        );
+
+        return false;
+    }
+}
+
+
+// ============================================================
+// CACHE DAILY MOTION
+// ============================================================
+
+const DM_CACHE_MS =
+    30 * 1000;
+
 
 const dmCache = new Map();
 
@@ -412,17 +456,12 @@ function guardarDailymotionCache(
     url
 ) {
 
-    if (!url) {
-        return;
-    }
-
     dmCache.set(
         `dm_${videoId}`,
         {
             url,
-            expira:
-                Date.now() +
-                DM_CACHE_MS
+            expires:
+                Date.now() + DM_CACHE_MS
         }
     );
 }
@@ -432,155 +471,58 @@ function obtenerDailymotionCache(
     videoId
 ) {
 
-    const cacheKey =
-        `dm_${videoId}`;
+    const dato =
+        dmCache.get(`dm_${videoId}`);
 
-    const cached =
-        dmCache.get(cacheKey);
-
-    if (
-        cached &&
-        cached.expira > Date.now()
-    ) {
-
-        return cached.url;
+    if (!dato) {
+        return null;
     }
 
-    if (cached) {
-        dmCache.delete(cacheKey);
-    }
 
-    return null;
-}
+    if (Date.now() > dato.expires) {
 
-
-function esM3U8(url) {
-
-    if (
-        typeof url !== 'string' ||
-        !url
-    ) {
-        return false;
-    }
-
-    return (
-        url.includes('.m3u8') ||
-        url.includes('/manifest/')
-    );
-}
-
-
-async function comprobarM3U8(
-    streamUrl,
-    videoId
-) {
-
-    if (!esM3U8(streamUrl)) {
-
-        return false;
-    }
-
-    try {
-
-        const respuesta =
-            await axios.get(
-                streamUrl,
-                {
-                    httpAgent:
-                        agenteParaUrl(
-                            streamUrl
-                        ),
-
-                    httpsAgent:
-                        agenteParaUrl(
-                            streamUrl
-                        ),
-
-                    timeout: 7000,
-
-                    responseType: 'text',
-
-                    headers: {
-                        'User-Agent':
-                            USER_AGENT,
-
-                        'Referer':
-                            `https://www.dailymotion.com/video/${videoId}`
-                    },
-
-                    validateStatus:
-                        status =>
-                            status >= 200 &&
-                            status < 400
-                }
-            );
-
-
-        const contenido =
-            String(
-                respuesta.data || ''
-            );
-
-
-        if (
-            contenido.includes(
-                '#EXTM3U'
-            )
-        ) {
-
-            return true;
-        }
-
-
-        console.warn(
-            `[Dailymotion] ${videoId} respondió sin #EXTM3U`
+        dmCache.delete(
+            `dm_${videoId}`
         );
 
-        return false;
-
-    } catch (e) {
-
-        console.warn(
-            `[Dailymotion] No se pudo verificar M3U8 ${videoId}:`,
-            e.message
-        );
-
-        return false;
+        return null;
     }
+
+
+    return dato.url;
 }
 
+
+// ============================================================
+// EXTRACTOR DAILY MOTION
+// ============================================================
 
 async function extraerStreamDailymotion(
     videoId
 ) {
 
-    /*
-       ---------------------------------------------------------
-       1. CACHE
-       ---------------------------------------------------------
-    */
-
-    const cacheUrl =
-        obtenerDailymotionCache(
-            videoId
-        );
+    const cache =
+        obtenerDailymotionCache(videoId);
 
 
-    if (cacheUrl) {
+    if (cache) {
 
         console.log(
-            `[Dailymotion] ${videoId} usando URL en caché`
+            `[Dailymotion] Usando cache para ${videoId}`
         );
 
-        return cacheUrl;
+        return cache;
     }
 
 
-    /*
-       ---------------------------------------------------------
-       2. PLAYER METADATA
-       ---------------------------------------------------------
-    */
+    console.log(
+        `[Dailymotion] Buscando URL nueva para ${videoId}...`
+    );
+
+
+    // --------------------------------------------------------
+    // 1. PLAYER METADATA
+    // --------------------------------------------------------
 
     try {
 
@@ -592,142 +534,160 @@ async function extraerStreamDailymotion(
             await axios.get(
                 metadataUrl,
                 {
-                    httpAgent:
-                        agenteHttp,
-
-                    httpsAgent:
-                        agenteSeguro,
-
-                    timeout: 8000,
+                    timeout: 10000,
 
                     headers: {
                         'User-Agent':
                             USER_AGENT,
 
                         'Referer':
-                            `https://www.dailymotion.com/embed/video/${videoId}`
-                    }
+                            `https://www.dailymotion.com/video/${videoId}`,
+
+                        'Accept':
+                            'application/json,text/plain,*/*'
+                    },
+
+                    validateStatus:
+                        status =>
+                            status >= 200 &&
+                            status < 400
                 }
             );
 
 
-        const qualities =
-            respuesta.data?.qualities;
+        const data =
+            respuesta.data;
 
 
-        if (qualities) {
-
-            let candidatos = [];
+        const candidatos = [];
 
 
-            if (
-                Array.isArray(
-                    qualities.auto
+        // qualities.auto
+        if (
+            data &&
+            data.qualities &&
+            data.qualities.auto
+        ) {
+
+            const auto =
+                data.qualities.auto;
+
+
+            if (Array.isArray(auto)) {
+
+                for (const item of auto) {
+
+                    if (
+                        typeof item === 'string'
+                    ) {
+
+                        candidatos.push(item);
+
+                    } else if (
+                        item &&
+                        typeof item.url === 'string'
+                    ) {
+
+                        candidatos.push(
+                            item.url
+                        );
+                    }
+                }
+            }
+        }
+
+
+        // Todas las qualities
+        if (
+            data &&
+            data.qualities
+        ) {
+
+            for (
+                const calidad of Object.values(
+                    data.qualities
                 )
             ) {
 
-                candidatos =
-                    qualities.auto;
+                if (!Array.isArray(calidad)) {
+                    continue;
+                }
 
-            } else {
+                for (const item of calidad) {
 
-                candidatos =
-                    Object.values(
-                        qualities
-                    )
-                        .flat()
-                        .filter(Boolean);
-            }
+                    if (
+                        typeof item === 'string'
+                    ) {
 
+                        candidatos.push(item);
 
-            /*
-               Primero buscamos HLS 480p.
-            */
+                    } else if (
+                        item &&
+                        typeof item.url === 'string'
+                    ) {
 
-            const hls480 =
-                candidatos.find(
-                    q =>
-                        q?.url &&
-                        q.url.includes(
-                            '.m3u8'
-                        ) &&
-                        (
-                            String(
-                                q.type || ''
-                            ).includes('480') ||
-                            String(
-                                q.url
-                            ).includes('480')
-                        )
-                );
-
-
-            /*
-               Después cualquier HLS.
-            */
-
-            const candidatosHLS =
-                candidatos.filter(
-                    q =>
-                        q?.url &&
-                        q.url.includes(
-                            '.m3u8'
-                        )
-                );
-
-
-            const posibles = [];
-
-
-            if (hls480?.url) {
-                posibles.push(
-                    hls480.url
-                );
-            }
-
-
-            for (
-                const candidato
-                of candidatosHLS
-            ) {
-
-                if (
-                    candidato.url &&
-                    !posibles.includes(
-                        candidato.url
-                    )
-                ) {
-
-                    posibles.push(
-                        candidato.url
-                    );
+                        candidatos.push(
+                            item.url
+                        );
+                    }
                 }
             }
+        }
 
 
-            for (
-                const streamUrl
-                of posibles
-            ) {
+        const unicos =
+            [...new Set(candidatos)]
+                .filter(esM3U8);
 
-                if (
-                    await comprobarM3U8(
-                        streamUrl,
-                        videoId
-                    )
-                ) {
 
-                    guardarDailymotionCache(
-                        videoId,
-                        streamUrl
-                    );
+        // Preferir 480p
+        const ordenados =
+            unicos.sort((a, b) => {
 
-                    console.log(
-                        `[Dailymotion] ${videoId} -> HLS obtenido por metadata`
-                    );
+                const a480 =
+                    a.includes('480');
 
-                    return streamUrl;
+                const b480 =
+                    b.includes('480');
+
+                if (a480 && !b480) {
+                    return -1;
                 }
+
+                if (!a480 && b480) {
+                    return 1;
+                }
+
+                return 0;
+            });
+
+
+        for (const url of ordenados) {
+
+            console.log(
+                `[Dailymotion] Probando: ${url}`
+            );
+
+
+            const valido =
+                await comprobarM3U8(
+                    url,
+                    videoId
+                );
+
+
+            if (valido) {
+
+                guardarDailymotionCache(
+                    videoId,
+                    url
+                );
+
+                console.log(
+                    `[Dailymotion] M3U8 válido encontrado para ${videoId}`
+                );
+
+                return url;
             }
         }
 
@@ -740,163 +700,134 @@ async function extraerStreamDailymotion(
     }
 
 
-    /*
-       ---------------------------------------------------------
-       3. API DAILYMOTION
-       ---------------------------------------------------------
-    */
-
-    try {
-
-        /*
-           Para Live intentamos primero
-           stream_live_hls_url.
-        */
-
-        const apiLiveUrl =
-            `https://api.dailymotion.com/video/${videoId}?fields=stream_live_hls_url`;
-
-
-        const respuestaLive =
-            await axios.get(
-                apiLiveUrl,
-                {
-                    httpAgent:
-                        agenteHttp,
-
-                    httpsAgent:
-                        agenteSeguro,
-
-                    timeout: 7000,
-
-                    headers: {
-                        'User-Agent':
-                            USER_AGENT
-                    }
-                }
-            );
-
-
-        const liveUrl =
-            respuestaLive.data
-                ?.stream_live_hls_url;
-
-
-        if (liveUrl) {
-
-            if (
-                await comprobarM3U8(
-                    liveUrl,
-                    videoId
-                )
-            ) {
-
-                guardarDailymotionCache(
-                    videoId,
-                    liveUrl
-                );
-
-                console.log(
-                    `[Dailymotion API] ${videoId} -> stream_live_hls_url`
-                );
-
-                return liveUrl;
-            }
-        }
-
-    } catch (e) {
-
-        console.warn(
-            `[Dailymotion API] stream_live_hls_url falló para ${videoId}:`,
-            e.message
-        );
-    }
-
-
-    /*
-       ---------------------------------------------------------
-       4. API NORMAL HLS
-       ---------------------------------------------------------
-    */
+    // --------------------------------------------------------
+    // 2. API LIVE
+    // --------------------------------------------------------
 
     try {
 
         const apiUrl =
-            `https://api.dailymotion.com/video/${videoId}?fields=stream_hls_url`;
+            `https://api.dailymotion.com/video/${videoId}` +
+            `?fields=stream_live_hls_url`;
 
 
         const respuesta =
             await axios.get(
                 apiUrl,
                 {
-                    httpAgent:
-                        agenteHttp,
-
-                    httpsAgent:
-                        agenteSeguro,
-
-                    timeout: 7000,
+                    timeout: 10000,
 
                     headers: {
                         'User-Agent':
-                            USER_AGENT
+                            USER_AGENT,
+
+                        'Accept':
+                            'application/json'
                     }
                 }
             );
 
 
-        const streamUrl =
-            respuesta.data?.stream_hls_url;
+        const url =
+            respuesta.data &&
+            respuesta.data
+                .stream_live_hls_url;
 
 
-        if (streamUrl) {
+        if (
+            esM3U8(url) &&
+            await comprobarM3U8(
+                url,
+                videoId
+            )
+        ) {
 
-            if (
-                await comprobarM3U8(
-                    streamUrl,
-                    videoId
-                )
-            ) {
+            guardarDailymotionCache(
+                videoId,
+                url
+            );
 
-                guardarDailymotionCache(
-                    videoId,
-                    streamUrl
-                );
-
-                console.log(
-                    `[Dailymotion API] ${videoId} -> stream_hls_url`
-                );
-
-                return streamUrl;
-            }
+            return url;
         }
 
     } catch (e) {
 
         console.warn(
-            `[Dailymotion API] stream_hls_url falló para ${videoId}:`,
+            `[Dailymotion] API live falló para ${videoId}:`,
             e.message
         );
     }
 
 
-    /*
-       ---------------------------------------------------------
-       NO ENCONTRADO
-       ---------------------------------------------------------
-    */
+    // --------------------------------------------------------
+    // 3. API HLS NORMAL
+    // --------------------------------------------------------
 
-    console.warn(
-        `[Dailymotion] No se encontró HLS válido para ${videoId}`
+    try {
+
+        const apiUrl =
+            `https://api.dailymotion.com/video/${videoId}` +
+            `?fields=stream_hls_url`;
+
+
+        const respuesta =
+            await axios.get(
+                apiUrl,
+                {
+                    timeout: 10000,
+
+                    headers: {
+                        'User-Agent':
+                            USER_AGENT,
+
+                        'Accept':
+                            'application/json'
+                    }
+                }
+            );
+
+
+        const url =
+            respuesta.data &&
+            respuesta.data.stream_hls_url;
+
+
+        if (
+            esM3U8(url) &&
+            await comprobarM3U8(
+                url,
+                videoId
+            )
+        ) {
+
+            guardarDailymotionCache(
+                videoId,
+                url
+            );
+
+            return url;
+        }
+
+    } catch (e) {
+
+        console.warn(
+            `[Dailymotion] API HLS falló para ${videoId}:`,
+            e.message
+        );
+    }
+
+
+    console.error(
+        `[Dailymotion] No se encontró M3U8 válido para ${videoId}`
     );
 
     return null;
 }
 
 
-/* =========================================================
-   PROCESADOR PROXY Y REESCRITOR M3U8
-========================================================= */
+// ============================================================
+// PROXY DE PLAYLIST
+// ============================================================
 
 async function procesarPlaylistProxy(
     streamUrl,
@@ -907,40 +838,26 @@ async function procesarPlaylistProxy(
 
     try {
 
-        if (
-            !streamUrl ||
-            !urlHttpValida(streamUrl)
-        ) {
-
-            console.error(
-                '[Proxy] URL inválida:',
-                streamUrl
-            );
-
-            return false;
-        }
-
-
         const headers = {
-            'User-Agent': USER_AGENT
+            'User-Agent': USER_AGENT,
+            'Accept':
+                'application/vnd.apple.mpegurl,application/x-mpegURL,text/plain,*/*'
         };
 
 
         if (referer) {
+            headers.Referer = referer;
+        }
 
-            headers['Referer'] =
-                referer;
 
-            try {
+        const origen =
+            referer
+                ? new URL(referer).origin
+                : '';
 
-                headers['Origin'] =
-                    new URL(
-                        referer
-                    ).origin;
 
-            } catch {
-                // No hacemos nada.
-            }
+        if (origen) {
+            headers.Origin = origen;
         }
 
 
@@ -949,16 +866,12 @@ async function procesarPlaylistProxy(
                 streamUrl,
                 {
                     httpAgent:
-                        agenteParaUrl(
-                            streamUrl
-                        ),
+                        agenteParaUrl(streamUrl),
 
                     httpsAgent:
-                        agenteParaUrl(
-                            streamUrl
-                        ),
+                        agenteParaUrl(streamUrl),
 
-                    timeout: 10000,
+                    timeout: 15000,
 
                     responseType: 'text',
 
@@ -972,26 +885,16 @@ async function procesarPlaylistProxy(
             );
 
 
-        const contenido =
-            String(
-                respuesta.data || ''
-            );
+        let contenido =
+            String(respuesta.data || '');
 
-
-        /*
-           Verificación importante:
-           una playlist HLS válida debe comenzar
-           o contener #EXTM3U.
-        */
 
         if (
-            !contenido.includes(
-                '#EXTM3U'
-            )
+            !contenido.includes('#EXTM3U')
         ) {
 
-            console.warn(
-                `[Proxy] ${streamUrl} no devolvió un M3U8 válido.`
+            console.error(
+                `[PROXY] La respuesta no es M3U8: ${streamUrl}`
             );
 
             return false;
@@ -999,86 +902,99 @@ async function procesarPlaylistProxy(
 
 
         const baseUrl =
-            obtenerBaseUrl(req);
+            new URL(
+                streamUrl
+            );
 
 
         const lineas =
             contenido.split(/\r?\n/);
 
 
-        const nuevasLineas =
-            lineas.map(
-                linea => {
-
-                    const texto =
-                        linea.trim();
+        const resultado = [];
 
 
-                    if (
-                        texto &&
-                        !texto.startsWith('#')
-                    ) {
+        for (let linea of lineas) {
 
-                        let urlAbsoluta;
+            const texto =
+                linea.trim();
 
 
-                        try {
+            if (
+                !texto ||
+                texto.startsWith('#')
+            ) {
 
-                            urlAbsoluta =
-                                new URL(
-                                    texto,
-                                    streamUrl
-                                ).href;
-
-                        } catch {
-
-                            return linea;
-                        }
+                resultado.push(linea);
+                continue;
+            }
 
 
-                        const sig =
-                            firmar(
-                                urlAbsoluta,
-                                referer
-                            );
+            let urlFinal;
 
 
-                        const query =
-                            `url=${encodeURIComponent(urlAbsoluta)}` +
-                            `&ref=${encodeURIComponent(referer)}` +
-                            `&sig=${sig}`;
+            try {
+
+                urlFinal =
+                    new URL(
+                        texto,
+                        baseUrl
+                    ).href;
+
+            } catch {
+
+                resultado.push(linea);
+                continue;
+            }
 
 
-                        /*
-                           Si es otra playlist M3U8,
-                           enviamos a subplaylist.
-                        */
-
-                        if (
-                            texto.includes(
-                                '.m3u8'
-                            )
-                        ) {
-
-                            return (
-                                `${baseUrl}/api/proxy/subplaylist?${query}`
-                            );
-                        }
+            const ref =
+                referer || '';
 
 
-                        /*
-                           Segmentos TS/AAC/etc.
-                        */
-
-                        return (
-                            `${baseUrl}/api/proxy/segment?${query}`
-                        );
-                    }
+            const sig =
+                crearFirma(
+                    urlFinal,
+                    ref
+                );
 
 
-                    return linea;
-                }
-            );
+            if (
+                urlFinal.includes('.m3u8') ||
+                urlFinal.includes('/manifest/')
+            ) {
+
+                const proxyUrl =
+                    `${PUBLIC_URL || `${req.protocol}://${req.get('host')}`}` +
+                    `/api/proxy/subplaylist` +
+                    `?url=${encodeURIComponent(urlFinal)}` +
+                    `&ref=${encodeURIComponent(ref)}` +
+                    `&sig=${sig}`;
+
+
+                resultado.push(
+                    proxyUrl
+                );
+
+            } else {
+
+                const proxyUrl =
+                    `${PUBLIC_URL || `${req.protocol}://${req.get('host')}`}` +
+                    `/api/proxy/segment` +
+                    `?url=${encodeURIComponent(urlFinal)}` +
+                    `&ref=${encodeURIComponent(ref)}` +
+                    `&sig=${sig}`;
+
+
+                resultado.push(
+                    proxyUrl
+                );
+            }
+        }
+
+
+        contenido =
+            resultado.join('\n');
 
 
         res.setHeader(
@@ -1091,19 +1007,21 @@ async function procesarPlaylistProxy(
             'no-cache, no-store, must-revalidate'
         );
 
-
-        res.send(
-            nuevasLineas.join('\n')
+        res.setHeader(
+            'Access-Control-Allow-Origin',
+            '*'
         );
 
 
+        res.send(contenido);
+
         return true;
 
-    } catch (error) {
+    } catch (e) {
 
         console.error(
-            `[Proxy Error] Falló playlist ${streamUrl}:`,
-            error.message
+            `[PROXY] Error procesando playlist:`,
+            e.message
         );
 
         return false;
@@ -1111,112 +1029,133 @@ async function procesarPlaylistProxy(
 }
 
 
-/* =========================================================
-   ENDPOINT PROXY SUBPLAYLIST
-========================================================= */
+// ============================================================
+// PROXY SUBPLAYLIST
+// ============================================================
 
 app.get(
     '/api/proxy/subplaylist',
     async (req, res) => {
 
-        const params =
-            validarParametrosProxy(
-                req,
-                res
-            );
+        const {
+            url,
+            ref = '',
+            sig
+        } = req.query;
 
 
-        if (!params) {
-            return;
+        if (
+            !url ||
+            !sig ||
+            !comprobarFirma(
+                url,
+                ref,
+                sig
+            )
+        ) {
+
+            return res
+                .status(403)
+                .send('Firma inválida');
         }
 
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
-                params.url,
+                url,
                 req,
                 res,
-                params.ref
+                ref
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
-            res
-                .status(500)
+            return res
+                .status(502)
                 .send(
-                    'Error procesando transmisión'
+                    'Error obteniendo subplaylist'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   ENDPOINT PROXY SEGMENTOS
-========================================================= */
+// ============================================================
+// PROXY SEGMENT
+// ============================================================
 
 app.get(
     '/api/proxy/segment',
     async (req, res) => {
 
-        const params =
-            validarParametrosProxy(
-                req,
-                res
-            );
+        const {
+            url,
+            ref = '',
+            sig
+        } = req.query;
 
 
-        if (!params) {
-            return;
+        if (
+            !url ||
+            !sig ||
+            !comprobarFirma(
+                url,
+                ref,
+                sig
+            )
+        ) {
+
+            return res
+                .status(403)
+                .send('Firma inválida');
         }
 
 
         try {
 
             const headers = {
-                'User-Agent': USER_AGENT
+                'User-Agent':
+                    USER_AGENT
             };
 
 
-            if (params.ref) {
+            if (ref) {
 
-                headers['Referer'] =
-                    params.ref;
+                headers.Referer =
+                    ref;
 
 
                 try {
 
-                    headers['Origin'] =
-                        new URL(
-                            params.ref
-                        ).origin;
+                    headers.Origin =
+                        new URL(ref).origin;
 
-                } catch {
-                    // No hacemos nada.
-                }
+                } catch {}
             }
 
 
             const respuesta =
                 await axios.get(
-                    params.url,
+                    url,
                     {
                         httpAgent:
-                            agenteParaUrl(
-                                params.url
-                            ),
+                            agenteParaUrl(url),
 
                         httpsAgent:
-                            agenteParaUrl(
-                                params.url
-                            ),
+                            agenteParaUrl(url),
 
-                        timeout: 10000,
+                        timeout: 15000,
 
-                        responseType: 'stream',
+                        responseType:
+                            'stream',
 
-                        headers
+                        headers,
+
+                        validateStatus:
+                            status =>
+                                status >= 200 &&
+                                status < 400
                     }
                 );
 
@@ -1236,342 +1175,44 @@ app.get(
             }
 
 
+            res.setHeader(
+                'Access-Control-Allow-Origin',
+                '*'
+            );
+
+
             respuesta.data.pipe(res);
 
-        } catch (error) {
+        } catch (e) {
 
             console.error(
-                '[Proxy] Error de segmento:',
-                error.message
+                '[SEGMENT] Error:',
+                e.message
             );
 
-            res
-                .status(500)
-                .send(
-                    'Error de segmento'
-                );
-        }
-    }
-);
 
+            if (!res.headersSent) {
 
-/* =========================================================
-   PARSER DEPORTES M3U
-========================================================= */
-
-app.get(
-    '/api/deportes',
-    async (req, res) => {
-
-        try {
-
-            const respuesta =
-                await axios.get(
-                    SPORTS_M3U_URL,
-                    {
-                        timeout: 10000
-                    }
-                );
-
-
-            const lineas =
-                respuesta.data.split(
-                    /\r?\n/
-                );
-
-
-            const canales = [];
-
-            let canalActual = null;
-
-
-            const baseUrl =
-                obtenerBaseUrl(req);
-
-
-            for (
-                let i = 0;
-                i < lineas.length;
-                i++
-            ) {
-
-                const linea =
-                    lineas[i].trim();
-
-
-                if (
-                    linea.startsWith(
-                        '#EXTINF:'
-                    )
-                ) {
-
-                    const infoNombre =
-                        linea.split(',')[1] ||
-                        'Canal Deportivo';
-
-
-                    const logoMatch =
-                        linea.match(
-                            /tvg-logo="(.*?)"/
-                        );
-
-
-                    canalActual = {
-
-                        nombre:
-                            infoNombre.trim(),
-
-                        logo:
-                            logoMatch
-                                ? logoMatch[1]
-                                : ''
-                    };
-
-                } else if (
-                    linea &&
-                    !linea.startsWith('#') &&
-                    canalActual
-                ) {
-
-                    const streamOriginal =
-                        linea;
-
-
-                    const sig =
-                        firmar(
-                            streamOriginal,
-                            ''
-                        );
-
-
-                    const proxiedUrl =
-                        `${baseUrl}/api/proxy/subplaylist?url=${encodeURIComponent(streamOriginal)}&sig=${sig}`;
-
-
-                    canales.push({
-
-                        nombre:
-                            canalActual.nombre,
-
-                        logo:
-                            canalActual.logo,
-
-                        url:
-                            proxiedUrl
-                    });
-
-
-                    canalActual = null;
-                }
+                res
+                    .status(502)
+                    .send(
+                        'Error obteniendo segmento'
+                    );
             }
-
-
-            res.json(canales);
-
-        } catch (error) {
-
-            console.error(
-                '[Deportes] Error:',
-                error.message
-            );
-
-            res
-                .status(500)
-                .json({
-                    error:
-                        'No se pudo cargar la lista de deportes M3U'
-                });
         }
     }
 );
 
 
-/* =========================================================
-   CATÁLOGO DE CANALES
-========================================================= */
-
-async function obtenerListaCanalesProcesada(
-    req
-) {
-
-    const baseUrl =
-        obtenerBaseUrl(req);
-
-
-    try {
-
-        const respuesta =
-            await axios.get(
-                CANALES_JSON,
-                {
-                    timeout: 10000
-                }
-            );
-
-
-        const canales =
-            respuesta.data;
-
-
-        return canales.map(
-            canal => {
-
-                let targetUrl =
-                    canal.url;
-
-
-                const claveWeb =
-                    Object.keys(canal)
-                        .find(
-                            k =>
-                                k.endsWith(
-                                    '_web'
-                                ) &&
-                                canal[k]
-                        );
-
-
-                if (claveWeb) {
-
-                    const nombreApi =
-                        claveWeb.replace(
-                            '_web',
-                            ''
-                        );
-
-
-                    targetUrl =
-                        `${baseUrl}/api/${nombreApi}`;
-                }
-
-
-                if (
-                    !targetUrl &&
-                    canal.numero
-                ) {
-
-                    const numeroFormateado =
-                        String(
-                            canal.numero
-                        ).padStart(
-                            3,
-                            '0'
-                        );
-
-
-                    targetUrl =
-                        `https://hls.tvabierta.net/hls/${numeroFormateado}.m3u8`;
-                }
-
-
-                return {
-                    ...canal,
-                    url: targetUrl
-                };
-            }
-        );
-
-    } catch (error) {
-
-        console.error(
-            'Error cargando channels.json:',
-            error.message
-        );
-
-        return [];
-    }
-}
-
-
-app.get(
-    '/api/canales',
-    async (req, res) => {
-
-        const lista =
-            await obtenerListaCanalesProcesada(
-                req
-            );
-
-
-        if (lista.length > 0) {
-
-            res.json(lista);
-
-        } else {
-
-            res
-                .status(500)
-                .json({
-                    error:
-                        'No se pudo obtener la lista de canales'
-                });
-        }
-    }
-);
-
-
-app.get(
-    '/',
-    async (req, res) => {
-
-        const lista =
-            await obtenerListaCanalesProcesada(
-                req
-            );
-
-
-        if (lista.length > 0) {
-
-            res.json(lista);
-
-        } else {
-
-            res.send(
-                'ROKU Backend RD OK'
-            );
-        }
-    }
-);
-
-
-/* =========================================================
-   CANAL TELEMICRO
-========================================================= */
-
-app.get(
-    '/api/telemicro',
-    async (req, res) => {
-
-        const exito =
-            await procesarPlaylistProxy(
-                TELEMICRO_PLAYLIST,
-                req,
-                res,
-                'https://telemicro.com.do/'
-            );
-
-
-        if (!exito) {
-
-            res
-                .status(500)
-                .send(
-                    'Error en la señal'
-                );
-        }
-    }
-);
-
-
-/* =========================================================
-   CANAL 6
-========================================================= */
+// ============================================================
+// CANAL 6
+// ============================================================
 
 app.get(
     '/api/canal6',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL6_STREAM_URL,
                 req,
@@ -1579,27 +1220,27 @@ app.get(
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 6'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 7
-========================================================= */
+// ============================================================
+// CANAL 7
+// ============================================================
 
 app.get(
     '/api/canal7',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL7_STREAM_URL,
                 req,
@@ -1607,27 +1248,27 @@ app.get(
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 7'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 8
-========================================================= */
+// ============================================================
+// CANAL 8
+// ============================================================
 
 app.get(
     '/api/canal8',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL8_STREAM_URL,
                 req,
@@ -1635,67 +1276,76 @@ app.get(
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 8'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 9 - DAILYMOTION
-========================================================= */
+// ============================================================
+// CANAL 9 - DAILY MOTION
+// ============================================================
 
 app.get(
     '/api/canal9',
     async (req, res) => {
 
-        const streamUrlDm =
+        const url =
             await extraerStreamDailymotion(
                 CANAL9_VIDEO_ID
             );
 
 
-        if (streamUrlDm) {
+        if (!url) {
 
-            const exito =
-                await procesarPlaylistProxy(
-                    streamUrlDm,
-                    req,
-                    res,
-                    'https://www.dailymotion.com/'
+            return res
+                .status(503)
+                .send(
+                    'Señal no disponible para Canal 9'
                 );
-
-
-            if (exito) {
-                return;
-            }
         }
 
 
-        res
-            .status(503)
-            .send(
-                'Señal no disponible para Canal 9'
+        const ok =
+            await procesarPlaylistProxy(
+                url,
+                req,
+                res,
+                'https://www.dailymotion.com/'
             );
+
+
+        if (!ok) {
+
+            dmCache.delete(
+                `dm_${CANAL9_VIDEO_ID}`
+            );
+
+            res
+                .status(503)
+                .send(
+                    'Error en la señal del Canal 9'
+                );
+        }
     }
 );
 
 
-/* =========================================================
-   CANAL 10
-========================================================= */
+// ============================================================
+// CANAL 10
+// ============================================================
 
 app.get(
     '/api/canal10',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL10_STREAM_URL,
                 req,
@@ -1703,165 +1353,181 @@ app.get(
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 10'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 11 - DAILYMOTION
-========================================================= */
+// ============================================================
+// CANAL 11 - DAILY MOTION
+// ============================================================
 
 app.get(
     '/api/canal11',
     async (req, res) => {
 
-        const streamUrlDm =
+        const url =
             await extraerStreamDailymotion(
                 CANAL11_VIDEO_ID
             );
 
 
-        if (streamUrlDm) {
+        if (!url) {
 
-            const exito =
-                await procesarPlaylistProxy(
-                    streamUrlDm,
-                    req,
-                    res,
-                    'https://www.dailymotion.com/'
+            return res
+                .status(503)
+                .send(
+                    'Señal no disponible para Canal 11'
                 );
-
-
-            if (exito) {
-                return;
-            }
         }
 
 
-        res
-            .status(503)
-            .send(
-                'Señal no disponible para Canal 11'
+        const ok =
+            await procesarPlaylistProxy(
+                url,
+                req,
+                res,
+                'https://www.dailymotion.com/'
             );
+
+
+        if (!ok) {
+
+            dmCache.delete(
+                `dm_${CANAL11_VIDEO_ID}`
+            );
+
+            res
+                .status(503)
+                .send(
+                    'Error en la señal del Canal 11'
+                );
+        }
     }
 );
 
 
-/* =========================================================
-   CANAL 12 - DAILYMOTION
-========================================================= */
+// ============================================================
+// CANAL 12 - DAILY MOTION
+// ============================================================
 
 app.get(
     '/api/canal12',
     async (req, res) => {
 
-        const streamUrlDm =
+        const url =
             await extraerStreamDailymotion(
                 CANAL12_VIDEO_ID
             );
 
 
-        if (streamUrlDm) {
+        if (!url) {
 
-            const exito =
-                await procesarPlaylistProxy(
-                    streamUrlDm,
-                    req,
-                    res,
-                    'https://www.dailymotion.com/'
+            return res
+                .status(503)
+                .send(
+                    'Señal no disponible para Canal 12'
                 );
-
-
-            if (exito) {
-                return;
-            }
         }
 
 
-        res
-            .status(503)
-            .send(
-                'Señal no disponible para Canal 12'
+        const ok =
+            await procesarPlaylistProxy(
+                url,
+                req,
+                res,
+                'https://www.dailymotion.com/'
             );
+
+
+        if (!ok) {
+
+            dmCache.delete(
+                `dm_${CANAL12_VIDEO_ID}`
+            );
+
+            res
+                .status(503)
+                .send(
+                    'Error en la señal del Canal 12'
+                );
+        }
     }
 );
 
 
-/* =========================================================
-   CANAL 13
-========================================================= */
+// ============================================================
+// CANAL 13
+// ============================================================
 
 app.get(
     '/api/canal13',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL13_STREAM_URL,
                 req,
-                res,
-                'https://telemicro.com.do/'
+                res
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 13'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 15
-========================================================= */
+// ============================================================
+// CANAL 15
+// ============================================================
 
 app.get(
     '/api/canal15',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL15_STREAM_URL,
                 req,
-                res,
-                'https://telemicro.com.do/'
+                res
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 15'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 18
-========================================================= */
+// ============================================================
+// CANAL 18
+// ============================================================
 
 app.get(
     '/api/canal18',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL18_STREAM_URL,
                 req,
@@ -1869,27 +1535,27 @@ app.get(
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 18'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 19
-========================================================= */
+// ============================================================
+// CANAL 19
+// ============================================================
 
 app.get(
     '/api/canal19',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL19_STREAM_URL,
                 req,
@@ -1897,27 +1563,27 @@ app.get(
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 19'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 21
-========================================================= */
+// ============================================================
+// CANAL 21
+// ============================================================
 
 app.get(
     '/api/canal21',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL21_STREAM_URL,
                 req,
@@ -1925,109 +1591,122 @@ app.get(
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
                 .send(
-                    'Error en la señal'
+                    'Error en la señal del Canal 21'
                 );
         }
     }
 );
 
 
-/* =========================================================
-   CANAL 23 - DAILYMOTION
-========================================================= */
+// ============================================================
+// CANAL 23 - DAILY MOTION
+// ============================================================
 
 app.get(
     '/api/canal23',
     async (req, res) => {
 
-        const streamUrlDm =
+        const url =
             await extraerStreamDailymotion(
                 CANAL23_VIDEO_ID
             );
 
 
-        if (streamUrlDm) {
+        if (!url) {
 
-            const exito =
-                await procesarPlaylistProxy(
-                    streamUrlDm,
-                    req,
-                    res,
-                    'https://www.dailymotion.com/'
+            return res
+                .status(503)
+                .send(
+                    'Señal no disponible para Canal 23'
                 );
-
-
-            if (exito) {
-                return;
-            }
         }
 
 
-        res
-            .status(503)
-            .send(
-                'Señal no disponible para Canal 23'
+        const ok =
+            await procesarPlaylistProxy(
+                url,
+                req,
+                res,
+                'https://www.dailymotion.com/'
             );
+
+
+        if (!ok) {
+
+            dmCache.delete(
+                `dm_${CANAL23_VIDEO_ID}`
+            );
+
+            res
+                .status(503)
+                .send(
+                    'Error en la señal del Canal 23'
+                );
+        }
     }
 );
 
 
-/* =========================================================
-   CANAL 27
-   PRINCIPAL + RESPALDO
-========================================================= */
+// ============================================================
+// CANAL 27
+// ============================================================
 
 app.get(
     '/api/canal27',
     async (req, res) => {
 
-        if (
+        let ok =
             await procesarPlaylistProxy(
                 CANAL27_STREAM_URL,
                 req,
                 res
-            )
-        ) {
+            );
 
+
+        if (ok) {
             return;
         }
 
 
-        if (
+        console.warn(
+            '[CANAL 27] Playlist principal falló.'
+        );
+
+
+        ok =
             await procesarPlaylistProxy(
                 CANAL27_CHUNK_URL,
                 req,
                 res
-            )
-        ) {
-
-            return;
-        }
-
-
-        res
-            .status(503)
-            .send(
-                'Error en la señal del Canal 27'
             );
+
+
+        if (!ok) {
+
+            res
+                .status(503)
+                .send(
+                    'Señal no disponible para Canal 27'
+                );
+        }
     }
 );
 
 
-/* =========================================================
-   CANAL 32
-========================================================= */
+// ============================================================
+// CANAL 32
+// ============================================================
 
 app.get(
     '/api/canal32',
     async (req, res) => {
 
-        const exito =
+        const ok =
             await procesarPlaylistProxy(
                 CANAL32_STREAM_URL,
                 req,
@@ -2035,7 +1714,7 @@ app.get(
             );
 
 
-        if (!exito) {
+        if (!ok) {
 
             res
                 .status(500)
@@ -2047,24 +1726,48 @@ app.get(
 );
 
 
-/* =========================================================
-   CANAL 36
-   DAILYMOTION DINÁMICO
-========================================================= */
+// ============================================================
+// CANAL 33 - SUPER CANAL
+// ============================================================
 
-/*
-   NO existe respaldo sec2(...)
-   guardado en el código.
+app.get(
+    '/api/canal33',
+    async (req, res) => {
 
-   Cada vez que se necesita el Canal 36,
-   se intenta obtener una URL nueva usando:
+        console.log(
+            '[CANAL 33] Cargando Super Canal...'
+        );
 
-       xar1qcu
 
-   Si la URL obtenida falla al cargar el M3U8,
-   se elimina del caché y se vuelve a solicitar
-   otra URL nueva.
-*/
+        const ok =
+            await procesarPlaylistProxy(
+                CANAL33_STREAM_URL,
+                req,
+                res
+            );
+
+
+        if (!ok) {
+
+            console.error(
+                '[CANAL 33] No se pudo cargar Super Canal.'
+            );
+
+
+            res
+                .status(500)
+                .send(
+                    'Error en la señal del Canal 33'
+                );
+        }
+    }
+);
+
+
+// ============================================================
+// CANAL 36 - DAILY MOTION
+// SIN BACKUP sec2 CADUCABLE
+// ============================================================
 
 app.get(
     '/api/canal36',
@@ -2075,12 +1778,7 @@ app.get(
         );
 
 
-        /*
-           -----------------------------------------------------
-           PRIMER INTENTO
-           -----------------------------------------------------
-        */
-
+        // PRIMER INTENTO
         let streamUrlDm =
             await extraerStreamDailymotion(
                 CANAL36_VIDEO_ID
@@ -2088,11 +1786,6 @@ app.get(
 
 
         if (streamUrlDm) {
-
-            console.log(
-                `[CANAL 36] URL obtenida: ${streamUrlDm.substring(0, 100)}...`
-            );
-
 
             const dinamicoOK =
                 await procesarPlaylistProxy(
@@ -2104,19 +1797,9 @@ app.get(
 
 
             if (dinamicoOK) {
-
-                console.log(
-                    '[CANAL 36] Reproduciendo enlace dinámico.'
-                );
-
                 return;
             }
 
-
-            /*
-               Si la URL obtenida falló,
-               eliminamos el caché.
-            */
 
             dmCache.delete(
                 `dm_${CANAL36_VIDEO_ID}`
@@ -2124,18 +1807,12 @@ app.get(
 
 
             console.warn(
-                '[CANAL 36] La URL dinámica falló. Se solicitará otra.'
+                '[CANAL 36] La URL dinámica falló.'
             );
         }
 
 
-        /*
-           -----------------------------------------------------
-           SEGUNDO INTENTO
-           OBTENER OTRA URL NUEVA
-           -----------------------------------------------------
-        */
-
+        // SEGUNDO INTENTO
         console.log(
             '[CANAL 36] Segundo intento de obtener URL nueva...'
         );
@@ -2159,11 +1836,6 @@ app.get(
 
 
             if (segundoIntento) {
-
-                console.log(
-                    '[CANAL 36] Segundo enlace dinámico funcionando.'
-                );
-
                 return;
             }
 
@@ -2173,12 +1845,6 @@ app.get(
             );
         }
 
-
-        /*
-           -----------------------------------------------------
-           NO HAY STREAM
-           -----------------------------------------------------
-        */
 
         console.error(
             '[CANAL 36] No se pudo obtener un M3U8 válido de Dailymotion.'
@@ -2194,83 +1860,337 @@ app.get(
 );
 
 
-/* =========================================================
-   CANAL 37
-   DAILYMOTION + MANIFEST
-========================================================= */
+// ============================================================
+// CANAL 37
+// ============================================================
 
 app.get(
     '/api/canal37',
     async (req, res) => {
 
-        const streamUrlDm =
+        // PRIMERO intenta Dailymotion dinámico
+        const dinamico =
             await extraerStreamDailymotion(
                 CANAL37_VIDEO_ID
             );
 
 
-        if (streamUrlDm) {
+        if (dinamico) {
 
-            const dinamicoOK =
+            const ok =
                 await procesarPlaylistProxy(
-                    streamUrlDm,
+                    dinamico,
                     req,
                     res,
-                    'https://www.televisiondominicanaenvivo.com/'
+                    'https://www.dailymotion.com/'
                 );
 
 
-            if (dinamicoOK) {
+            if (ok) {
                 return;
             }
+
+
+            dmCache.delete(
+                `dm_${CANAL37_VIDEO_ID}`
+            );
         }
 
 
-        /*
-           Manifest de Dailymotion como alternativa.
-           No contiene un token sec2(...) fijo.
-        */
+        // FALLBACK AL MANIFEST
+        console.warn(
+            '[CANAL 37] Usando manifest de respaldo.'
+        );
 
-        if (
+
+        const ok =
             await procesarPlaylistProxy(
                 CANAL37_STREAM_URL,
                 req,
-                res,
-                'https://www.televisiondominicanaenvivo.com/'
-            )
-        ) {
-
-            return;
-        }
-
-
-        res
-            .status(503)
-            .send(
-                'Señal no disponible para Canal 37'
+                res
             );
+
+
+        if (!ok) {
+
+            res
+                .status(503)
+                .send(
+                    'Señal no disponible para Canal 37'
+                );
+        }
     }
 );
 
 
-/* =========================================================
-   INICIAR SERVIDOR
-========================================================= */
+// ============================================================
+// OBTENER CANALES DEL JSON
+// ============================================================
+
+async function obtenerListaCanalesProcesada(
+    req
+) {
+
+    try {
+
+        const respuesta =
+            await axios.get(
+                CANALES_JSON,
+                {
+                    timeout: 15000,
+                    headers: {
+                        'User-Agent':
+                            USER_AGENT
+                    }
+                }
+            );
+
+
+        const canales =
+            respuesta.data;
+
+
+        if (!Array.isArray(canales)) {
+
+            return canales;
+        }
+
+
+        const base =
+            PUBLIC_URL ||
+            `${req.protocol}://${req.get('host')}`;
+
+
+        return canales.map(canal => {
+
+            const nuevo = {
+                ...canal
+            };
+
+
+            for (
+                const [clave, valor]
+                of Object.entries(canal)
+            ) {
+
+                if (
+                    clave.endsWith('_web') &&
+                    valor === true
+                ) {
+
+                    const numero =
+                        clave
+                            .replace(
+                                '_web',
+                                ''
+                            );
+
+
+                    nuevo.url =
+                        `${base}/api/${numero}`;
+                }
+            }
+
+
+            return nuevo;
+        });
+
+
+    } catch (e) {
+
+        console.error(
+            '[CANALES] Error:',
+            e.message
+        );
+
+
+        throw e;
+    }
+}
+
+
+// ============================================================
+// API CANALES
+// ============================================================
+
+app.get(
+    '/api/canales',
+    async (req, res) => {
+
+        try {
+
+            const canales =
+                await obtenerListaCanalesProcesada(
+                    req
+                );
+
+
+            res.json(canales);
+
+        } catch {
+
+            res
+                .status(500)
+                .json({
+                    error:
+                        'No se pudo obtener la lista de canales'
+                });
+        }
+    }
+);
+
+
+// ============================================================
+// SPORTS
+// ============================================================
+
+app.get(
+    '/api/sports',
+    async (req, res) => {
+
+        try {
+
+            const respuesta =
+                await axios.get(
+                    SPORTS_M3U_URL,
+                    {
+                        timeout: 20000,
+
+                        headers: {
+                            'User-Agent':
+                                USER_AGENT
+                        },
+
+                        responseType:
+                            'text'
+                    }
+                );
+
+
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.apple.mpegurl'
+            );
+
+
+            res.send(
+                respuesta.data
+            );
+
+        } catch (e) {
+
+            console.error(
+                '[SPORTS] Error:',
+                e.message
+            );
+
+
+            res
+                .status(500)
+                .send(
+                    'Error obteniendo deportes'
+                );
+        }
+    }
+);
+
+
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+
+app.get(
+    '/',
+    (req, res) => {
+
+        res.json({
+            ok: true,
+            server: 'Roku IPTV Proxy',
+            canal33:
+                '/api/canal33',
+            canal36:
+                '/api/canal36'
+        });
+    }
+);
+
+
+app.get(
+    '/health',
+    (req, res) => {
+
+        res.json({
+            ok: true,
+            timestamp:
+                new Date().toISOString()
+        });
+    }
+);
+
+
+// ============================================================
+// 404
+// ============================================================
+
+app.use(
+    (req, res) => {
+
+        res
+            .status(404)
+            .json({
+                error:
+                    'Ruta no encontrada'
+            });
+    }
+);
+
+
+// ============================================================
+// ERRORES GENERALES
+// ============================================================
+
+app.use(
+    (err, req, res, next) => {
+
+        console.error(
+            '[ERROR GENERAL]',
+            err
+        );
+
+
+        if (
+            !res.headersSent
+        ) {
+
+            res
+                .status(500)
+                .json({
+                    error:
+                        'Error interno del servidor'
+                });
+        }
+    }
+);
+
+
+// ============================================================
+// INICIAR SERVIDOR
+// ============================================================
 
 app.listen(
     PORT,
     () => {
 
         console.log(
-            `Servidor escuchando en puerto ${PORT}`
+            `Servidor ejecutándose en puerto ${PORT}`
         );
 
         console.log(
-            `[CANAL 36] Dailymotion ID: ${CANAL36_VIDEO_ID}`
+            `Canal 33: /api/canal33`
         );
 
         console.log(
-            '[CANAL 36] Sin enlace sec2(...) fijo de respaldo.'
+            `Canal 36: /api/canal36`
         );
     }
 );
