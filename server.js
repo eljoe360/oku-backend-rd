@@ -62,12 +62,14 @@ const CANAL19_STREAM_URL = process.env.CANAL19_STREAM_URL || 'https://5790d294af
 const CANAL21_STREAM_URL = process.env.CANAL21_STREAM_URL || 'https://hls.tvabierta.net/hls/021.m3u8';
 const CANAL23_STREAM_URL = process.env.CANAL23_STREAM_URL || 'https://hls.tvabierta.net/hls/023.m3u8';
 const CANAL27_STREAM_URL = process.env.CANAL27_STREAM_URL || 'https://c.streamhoster.com/link/hls/W3s3kC/iuubLO3sAC5/mwuF5Xskck9_5/playlist.m3u8';
+const CANAL37_STREAM_URL = process.env.CANAL37_STREAM_URL || 'https://dmxleo.dailymotion.com/cdn/manifest/video/x9lincs.m3u8?af=2%2C7%2C8%2C9&vv=1%2C2%2C3%2C4%2C5%2C6%2C7%2C8%2C11%2C12%2C13%2C14&mm=video%2Fmp4%2Cvideo%2Fwebm%2Caudio%2Fmp4%2Caudio%2Fmpeg%2Caudio%2Faac%2Caudio%2Fmpeg3%2Caudio%2Fmp3%2Caudio%2Fvnd.wave%2Caudio%2Fwav%2Caudio%2Fwave%2Caudio%2Fogg%2Caudio%2Fvorbis%2Cimage%2Fjpeg%2Cimage%2Fpng%2Cimage%2Fwebp%2Cimage%2Fsvg%2Bxml&cse=1k44efh3m06aad97948&rts=803277&rhv=1&cen=prod&cpi=x3jtcrw&cpt=player&rla=en&cpr=x1b7bk&rdm=704068a5-e47c-4a6a-a344-54664382be46&eb=https%3A%2F%2Fwww.televisiondominicanaenvivo.com%2F&ps=661x372&td=www.televisiondominicanaenvivo.com&reader_gdpr_flag=0&reader_gdpr_consent=&gdpr_binary_consent=opt-out&gdpr_comes_from_infopack=0&reader_us_privacy=1---&vl=10&ciid=1k44efh3m06aad97948_VMAP_0_0&cidx=0&sidx=0&vidIdx=0&omp=Dailymotion%2F1.0&omn=0&imal=1&3pcb=0&rap=1&apo=monetization&pos=1&pdm=regular&pbm=1';
 
 /* IDENTIFICADORES DAILYMOTION */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
 const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
 const CANAL12_VIDEO_ID = process.env.CANAL12_VIDEO_ID || 'xaio352';
 const CANAL23_VIDEO_ID = process.env.CANAL23_VIDEO_ID || 'x9imtbq';
+const CANAL37_VIDEO_ID = process.env.CANAL37_VIDEO_ID || 'x9lincs';
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -460,10 +462,17 @@ app.get('/api/canal23', async (req, res) => {
     res.status(503).send('Señal no disponible para Canal 23');
 });
 
-/* NUEVO ENDPOINT PARA EL CANAL 27 */
 app.get('/api/canal27', async (req, res) => {
     const exito = await procesarPlaylistProxy(CANAL27_STREAM_URL, req, res);
     if (!exito) res.status(500).send('Error en la señal del Canal 27');
+});
+
+/* NUEVO ENDPOINT PARA EL CANAL 37 */
+app.get('/api/canal37', async (req, res) => {
+    const streamUrlDm = await extraerStreamDailymotion(CANAL37_VIDEO_ID);
+    if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.televisiondominicanaenvivo.com/'))) return;
+    if (await procesarPlaylistProxy(CANAL37_STREAM_URL, req, res, 'https://www.televisiondominicanaenvivo.com/')) return;
+    res.status(503).send('Señal no disponible para Canal 37');
 });
 
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
