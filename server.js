@@ -64,8 +64,7 @@ const CANAL23_STREAM_URL = process.env.CANAL23_STREAM_URL || 'https://hls.tvabie
 const CANAL27_STREAM_URL = process.env.CANAL27_STREAM_URL || 'https://2-fss-2.streamhoster.com/pl_138/206532-6829902-1/playlist.m3u8';
 const CANAL27_CHUNK_URL  = process.env.CANAL27_CHUNK_URL  || 'https://2-fss-2.streamhoster.com/pl_138/206532-6829902-1/chunklist.m3u8';
 const CANAL32_STREAM_URL = process.env.CANAL32_STREAM_URL || 'https://edge.livestreaminggroup.info/vtv32live/index.m3u8';
-const CANAL36_STREAM_URL = process.env.CANAL36_STREAM_URL || 'https://live.eu-north-1a.cf.dmcdn.net/sec2(rsqusoFpjgHqCgkTyxVgaaLCqMP8JvutmGOlT9afuB1V5GYJByYGXKnEicXlBc3fZcuEW0fatAspQ1dSQBnw0KMgxji-kn93sKGTZqz8DGGjpKBn_aeDtcwMLCrd6Ro068p_PkVz3OH_eXaRykm3nAT-_TfBwxXA30slT__b4LZF-NIrP3F2VN7FOwjAp_5r)/dm/4/xar1qcu/live-h264-480.m3u8';
-const CANAL37_STREAM_URL = process.env.CANAL37_STREAM_URL || 'https://dmxleo.dailymotion.com/cdn/manifest/video/x9lincs.m3u8?af=2%2C7%2C8%2C9&vv=1%2C2%2C3%2C4%2C5%2C6%2C7%2C8%2C11%2C12%2C13%2C14&mm=video%2Fmp4%2Cvideo%2Fwebm%2Caudio%2Fmp4%2Caudio%2Fmpeg%2Caudio%2Faac%2Caudio%2Fmpeg3%2Caudio%2Fmp3%2Caudio%2Fvnd.wave%2Caudio%2Fwav%2Caudio%2Fwave%2Caudio%2Fogg%2Caudio%2Fvorbis%2Cimage%2Fjpeg%2Cimage%2Fpng%2Cimage%2Fwebp%2Cimage%2Fsvg%2Bxml&cse=1k44efh3m06aad97948&rts=803277&rhv=1&cen=prod&cpi=x3jtcrw&cpt=player&rla=en&cpr=x1b7bk&rdm=704068a5-e47c-4a6a-a344-54664382be46&eb=https%3A%2F%2Fwww.televisiondominicanaenvivo.com%2F&ps=661x372&td=www.televisiondominicanaenvivo.com&reader_gdpr_flag=0&reader_gdpr_consent=&gdpr_binary_consent=opt-out&gdpr_comes_from_infopack=0&reader_us_privacy=1---&vl=10&ciid=1k44efh3m06aad97948_VMAP_0_0&cidx=0&sidx=0&vidIdx=0&omp=Dailymotion%2F1.0&omn=0&imal=1&3pcb=0&rap=1&apo=monetization&pos=1&pdm=regular&pbm=1';
+const CANAL37_STREAM_URL = process.env.CANAL37_STREAM_URL || 'https://dmxleo.dailymotion.com/cdn/manifest/video/x9lincs.m3u8';
 
 /* IDENTIFICADORES DAILYMOTION */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
@@ -153,7 +152,7 @@ function validarParametrosProxy(req, res) {
 /* =========================================================
    EXTRACTOR AUTOMÁTICO DE DAILYMOTION
 ========================================================= */
-const DM_CACHE_MS = 10 * 1000;
+const DM_CACHE_MS = 5 * 1000;
 const dmCache = new Map();
 
 async function extraerStreamDailymotion(videoId) {
@@ -182,11 +181,12 @@ async function extraerStreamDailymotion(videoId) {
             
             if (videoStream?.url) {
                 dmCache.set(cacheKey, { url: videoStream.url, expira: ahora + DM_CACHE_MS });
+                console.log(`[Dailymotion] URL fresca obtenida para ID ${videoId}`);
                 return videoStream.url;
             }
         }
     } catch (e) {
-        console.warn(`[Dailymotion API] Error para ID ${videoId}: ${e.message}`);
+        console.warn(`[Dailymotion API Warning] ID ${videoId}: ${e.message}`);
     }
 
     try {
@@ -252,6 +252,7 @@ async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
         res.send(nuevasLineas.join('\n'));
         return true;
     } catch (error) {
+        console.error(`[Proxy Error] Falló al obtener playlist ${streamUrl}:`, error.message);
         return false;
     }
 }
@@ -411,7 +412,6 @@ app.get('/api/canal8', async (req, res) => {
 app.get('/api/canal9', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
-    if (await procesarPlaylistProxy(CANAL9_STREAM_URL, req, res)) return;
     res.status(503).send('Señal no disponible para Canal 9');
 });
 
@@ -423,14 +423,12 @@ app.get('/api/canal10', async (req, res) => {
 app.get('/api/canal11', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL11_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
-    if (await procesarPlaylistProxy(CANAL11_STREAM_URL, req, res)) return;
     res.status(503).send('Señal no disponible para Canal 11');
 });
 
 app.get('/api/canal12', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL12_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
-    if (await procesarPlaylistProxy(CANAL12_STREAM_URL, req, res)) return;
     res.status(503).send('Señal no disponible para Canal 12');
 });
 
@@ -462,7 +460,6 @@ app.get('/api/canal21', async (req, res) => {
 app.get('/api/canal23', async (req, res) => {
     const streamUrlDm = await extraerStreamDailymotion(CANAL23_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
-    if (await procesarPlaylistProxy(CANAL23_STREAM_URL, req, res)) return;
     res.status(503).send('Señal no disponible para Canal 23');
 });
 
@@ -478,11 +475,8 @@ app.get('/api/canal32', async (req, res) => {
 });
 
 app.get('/api/canal36', async (req, res) => {
-    if (await procesarPlaylistProxy(CANAL36_STREAM_URL, req, res, 'https://www.dailymotion.com/')) return;
-    
     const streamUrlDm = await extraerStreamDailymotion(CANAL36_VIDEO_ID);
     if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
-    
     res.status(503).send('Señal no disponible o expirada para Canal 36');
 });
 
