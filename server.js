@@ -140,15 +140,16 @@ function validarParametrosProxy(req, res) {
 }
 
 /* =========================================================
-   EXTRACTOR AUTOMÁTICO DE DAILYMOTION
+   EXTRACTOR AUTOMÁTICO DE DAILYMOTION (REGENERACIÓN ACTIVA)
 ========================================================= */
-const DM_CACHE_MS = 15 * 1000;
+const DM_CACHE_MS = 10 * 1000;
 const dmCache = new Map();
 
 async function extraerStreamDailymotion(videoId) {
     const ahora = Date.now();
     const cacheKey = `dm_${videoId}`;
     const cached = dmCache.get(cacheKey);
+    
     if (cached && cached.expira > ahora) return cached.url;
 
     try {
@@ -167,13 +168,14 @@ async function extraerStreamDailymotion(videoId) {
         if (qualities) {
             const autoList = qualities.auto || Object.values(qualities).flat();
             const videoStream = autoList.find(q => q.url && q.url.includes('.m3u8'));
+            
             if (videoStream?.url) {
                 dmCache.set(cacheKey, { url: videoStream.url, expira: ahora + DM_CACHE_MS });
                 return videoStream.url;
             }
         }
     } catch (e) {
-        console.warn(`[Dailymotion Player API] Falló para ID ${videoId}: ${e.message}`);
+        console.warn(`[Dailymotion API] Error al refrescar token para ID ${videoId}: ${e.message}`);
     }
 
     try {
@@ -191,7 +193,7 @@ async function extraerStreamDailymotion(videoId) {
             return streamUrl;
         }
     } catch (e) {
-        console.error(`[Dailymotion API Error] ID ${videoId}:`, e.message);
+        console.error(`[Dailymotion REST Error] ID ${videoId}:`, e.message);
     }
 
     return null;
@@ -281,6 +283,48 @@ app.get('/api/proxy/segment', async (req, res) => {
 });
 
 /* =========================================================
+   PARSER Y ENDPOINT DE CATÁLOGO DEPORTIVO M3U (IPTV-ORG)
+========================================================= */
+app.get('/api/deportes', async (req, res) => {
+    try {
+        const respuesta = await axios.get(SPORTS_M3U_URL, { timeout: 10000 });
+        const lineas = respuesta.data.split(/\r?\n/);
+        const canales = [];
+        let canalActual = null;
+
+        const baseUrl = obtenerBaseUrl(req);
+
+        for (let i = 0; i < lineas.length; i++) {
+            const linea = lineas[i].trim();
+            if (linea.startsWith('#EXTINF:')) {
+                const infoNombre = linea.split(',')[1] || 'Canal Deportivo';
+                const logoMatch = linea.match(/tvg-logo="(.*?)"/);
+                canalActual = {
+                    nombre: infoNombre.trim(),
+                    logo: logoMatch ? logoMatch[1] : ''
+                };
+            } else if (linea && !linea.startsWith('#') && canalActual) {
+                const streamOriginal = linea;
+                const sig = firmar(streamOriginal, '');
+                const proxiedUrl = `${baseUrl}/api/proxy/subplaylist?url=${encodeURIComponent(streamOriginal)}&sig=${sig}`;
+
+                canales.push({
+                    nombre: canalActual.nombre,
+                    logo: canalActual.logo,
+                    url: proxiedUrl
+                });
+                canalActual = null;
+            }
+        }
+
+        res.json(canales);
+    } catch (error) {
+        console.error('[Error Cargando M3U Deportes]:', error.message);
+        res.status(500).json({ error: 'No se pudo cargar la lista de deportes M3U' });
+    }
+});
+
+/* =========================================================
    RUTAS DE LOS CANALES Y CATÁLOGOS
 ========================================================= */
 async function obtenerListaCanalesProcesada(req) {
@@ -324,7 +368,6 @@ app.get('/api/canales', async (req, res) => {
     }
 });
 
-// Soporte directo para la ruta raíz requerida por Roku
 app.get('/', async (req, res) => {
     const lista = await obtenerListaCanalesProcesada(req);
     if (lista.length > 0) {
