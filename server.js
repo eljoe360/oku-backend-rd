@@ -45,7 +45,7 @@ const SPORTS_M3U_URL = process.env.SPORTS_M3U_URL || 'https://iptv-org.github.io
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 /* =========================================================
-   FUENTES DIRECTAS ESTABLES (SIN TOKENS NI SESIONES EXPIRABLES)
+   FUENTES DIRECTAS ESTABLES
 ========================================================= */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL  = process.env.CANAL6_STREAM_URL  || 'https://stream.elseis.do/canal6/master.m3u8';
@@ -59,7 +59,7 @@ const CANAL19_STREAM_URL = process.env.CANAL19_STREAM_URL || 'https://5790d294af
 const CANAL21_STREAM_URL = process.env.CANAL21_STREAM_URL || 'https://hls.tvabierta.net/hls/021.m3u8';
 
 /* =========================================================
-   IDENTIFICADORES DAILYMOTION (EXTRACCIÓN DINÁMICA 100% ACTIVA)
+   IDENTIFICADORES DAILYMOTION
 ========================================================= */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
 const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
@@ -142,7 +142,7 @@ function validarParametrosProxy(req, res) {
 /* =========================================================
    EXTRACTOR AUTOMÁTICO DE DAILYMOTION
 ========================================================= */
-const DM_CACHE_MS = 10 * 1000;
+const DM_CACHE_MS = 15 * 1000;
 const dmCache = new Map();
 
 async function extraerStreamDailymotion(videoId) {
@@ -163,8 +163,8 @@ async function extraerStreamDailymotion(videoId) {
             }
         });
 
-        if (respuesta.data?.qualities) {
-            const qualities = respuesta.data.qualities;
+        const qualities = respuesta.data?.qualities;
+        if (qualities) {
             const autoList = qualities.auto || Object.values(qualities).flat();
             const videoStream = autoList.find(q => q.url && q.url.includes('.m3u8'));
             if (videoStream?.url) {
@@ -173,35 +173,7 @@ async function extraerStreamDailymotion(videoId) {
             }
         }
     } catch (e) {
-        console.warn(`[Dailymotion Player API] Falló para ${videoId}, usando scraper de respaldo...`);
-    }
-
-    try {
-        const embedUrl = `https://www.dailymotion.com/embed/video/${videoId}`;
-        const respuestaHTML = await axios.get(embedUrl, {
-            httpAgent: agenteHttp,
-            httpsAgent: agenteSeguro,
-            timeout: 6000,
-            headers: { 'User-Agent': USER_AGENT }
-        });
-
-        const match = respuestaHTML.data.match(/var\s+config\s*=\s*(\{.*?\});/s) || 
-                      respuestaHTML.data.match(/window\.__PLAYER_CONFIG__\s*=\s*(\{.*?\});/s);
-
-        if (match && match[1]) {
-            const configData = JSON.parse(match[1]);
-            const qualities = configData?.metadata?.qualities;
-            if (qualities) {
-                const autoList = qualities.auto || Object.values(qualities).flat();
-                const videoStream = autoList.find(q => q.url && q.url.includes('.m3u8'));
-                if (videoStream?.url) {
-                    dmCache.set(cacheKey, { url: videoStream.url, expira: ahora + DM_CACHE_MS });
-                    return videoStream.url;
-                }
-            }
-        }
-    } catch (e) {
-        console.error(`[Dailymotion Scraper Error] ID ${videoId}:`, e.message);
+        console.warn(`[Dailymotion Player API] Falló para ID ${videoId}: ${e.message}`);
     }
 
     try {
@@ -219,7 +191,7 @@ async function extraerStreamDailymotion(videoId) {
             return streamUrl;
         }
     } catch (e) {
-        console.error(`[Dailymotion REST API Error] ID ${videoId}:`, e.message);
+        console.error(`[Dailymotion API Error] ID ${videoId}:`, e.message);
     }
 
     return null;
@@ -309,57 +281,15 @@ app.get('/api/proxy/segment', async (req, res) => {
 });
 
 /* =========================================================
-   PARSER Y ENDPOINT DE CATÁLOGO DEPORTIVO M3U (IPTV-ORG)
+   RUTAS DE LOS CANALES Y CATÁLOGOS
 ========================================================= */
-app.get('/api/deportes', async (req, res) => {
-    try {
-        const respuesta = await axios.get(SPORTS_M3U_URL, { timeout: 10000 });
-        const lineas = respuesta.data.split(/\r?\n/);
-        const canales = [];
-        let canalActual = null;
-
-        const baseUrl = obtenerBaseUrl(req);
-
-        for (let i = 0; i < lineas.length; i++) {
-            const linea = lineas[i].trim();
-            if (linea.startsWith('#EXTINF:')) {
-                const infoNombre = linea.split(',')[1] || 'Canal Deportivo';
-                const logoMatch = linea.match(/tvg-logo="(.*?)"/);
-                canalActual = {
-                    nombre: infoNombre.trim(),
-                    logo: logoMatch ? logoMatch[1] : ''
-                };
-            } else if (linea && !linea.startsWith('#') && canalActual) {
-                const streamOriginal = linea;
-                const sig = firmar(streamOriginal, '');
-                const proxiedUrl = `${baseUrl}/api/proxy/subplaylist?url=${encodeURIComponent(streamOriginal)}&sig=${sig}`;
-
-                canales.push({
-                    nombre: canalActual.nombre,
-                    logo: canalActual.logo,
-                    url: proxiedUrl
-                });
-                canalActual = null;
-            }
-        }
-
-        res.json(canales);
-    } catch (error) {
-        console.error('[Error Cargando M3U Deportes]:', error.message);
-        res.status(500).json({ error: 'No se pudo cargar la lista de deportes M3U' });
-    }
-});
-
-/* =========================================================
-   RUTAS DE LOS CANALES LOCALES
-========================================================= */
-app.get('/api/canales', async (req, res) => {
+async function obtenerListaCanalesProcesada(req) {
+    const baseUrl = obtenerBaseUrl(req);
     try {
         const respuesta = await axios.get(CANALES_JSON, { timeout: 10000 });
         const canales = respuesta.data;
-        const baseUrl = obtenerBaseUrl(req);
 
-        const resultado = canales.map(canal => {
+        return canales.map(canal => {
             let targetUrl = canal.url;
 
             if (canal.telemicro_web) targetUrl = `${baseUrl}/api/telemicro`;
@@ -379,13 +309,34 @@ app.get('/api/canales', async (req, res) => {
 
             return { ...canal, url: targetUrl };
         });
-
-        res.json(resultado);
     } catch (error) {
+        console.error('[Error obteniendo JSON de canales]:', error.message);
+        return [];
+    }
+}
+
+app.get('/api/canales', async (req, res) => {
+    const lista = await obtenerListaCanalesProcesada(req);
+    if (lista.length > 0) {
+        res.json(lista);
+    } else {
         res.status(500).json({ error: 'No se pudo obtener la lista de canales' });
     }
 });
 
+// Soporte directo para la ruta raíz requerida por Roku
+app.get('/', async (req, res) => {
+    const lista = await obtenerListaCanalesProcesada(req);
+    if (lista.length > 0) {
+        res.json(lista);
+    } else {
+        res.send('ROKU Backend RD OK');
+    }
+});
+
+/* =========================================================
+   ENDPOINTS INDIVIDUALES DE CANALES
+========================================================= */
 app.get('/api/telemicro', async (req, res) => {
     await procesarPlaylistProxy(TELEMICRO_PLAYLIST, req, res, 'https://telemicro.com.do/');
 });
@@ -404,7 +355,7 @@ app.get('/api/canal8', async (req, res) => {
 
 app.get('/api/canal9', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 9');
+    if (!streamUrl) return res.status(503).send('Señal no disponible para Canal 9');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
@@ -414,13 +365,13 @@ app.get('/api/canal10', async (req, res) => {
 
 app.get('/api/canal11', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL11_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 11');
+    if (!streamUrl) return res.status(503).send('Señal no disponible para Canal 11');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
 app.get('/api/canal12', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL12_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 12');
+    if (!streamUrl) return res.status(503).send('Señal no disponible para Canal 12');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
@@ -446,10 +397,8 @@ app.get('/api/canal21', async (req, res) => {
 
 app.get('/api/canal23', async (req, res) => {
     const streamUrl = await extraerStreamDailymotion(CANAL23_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 23');
+    if (!streamUrl) return res.status(503).send('Señal no disponible para Canal 23');
     await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
-
-app.get('/', (req, res) => res.send('ROKU Backend RD OK'));
 
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
