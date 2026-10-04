@@ -2,26 +2,32 @@ const express = require('express');
 const { obtenerUrlCanal } = require('./extractor');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 app.use(express.json());
 
-// Ruta raíz
+// Ruta principal para verificar que el servidor funciona
 app.get('/', (req, res) => {
-  res.send('Servidor activo y listo para extraer enlaces.');
+  res.send('Servidor de Roku activo y listo.');
 });
 
-// Ruta dinámica para extraer y redirigir al flujo M3U8 de Telesistema
+// Ruta de extracción dinámica para Telesistema
 app.get('/live/telesistema', async (req, res) => {
-  console.log('Obteniendo señal de Telesistema...');
+  console.log('Iniciando extracción de Telesistema...');
   const urlCanal = 'https://telesistema11.com.do/';
   
-  const streamUrl = await obtenerUrlCanal(urlCanal);
+  try {
+    const streamUrl = await obtenerUrlCanal(urlCanal);
 
-  if (streamUrl) {
-    res.redirect(streamUrl);
-  } else {
-    res.status(500).json({ error: 'No se pudo obtener la transmisión en vivo.' });
+    if (streamUrl) {
+      console.log('Redirigiendo a:', streamUrl);
+      res.redirect(streamUrl);
+    } else {
+      res.status(500).json({ error: 'No se pudo capturar el enlace M3U8.' });
+    }
+  } catch (error) {
+    console.error('Error en el endpoint:', error);
+    res.status(500).json({ error: 'Error interno del servidor.' });
   }
 });
 
