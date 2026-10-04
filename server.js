@@ -6,15 +6,15 @@ const PORT = process.env.PORT || 10000;
 
 app.use(express.json());
 
-// Ruta principal para verificar que el servidor funciona
 app.get('/', (req, res) => {
   res.send('Servidor de Roku activo y listo.');
 });
 
-// Ruta de extracción dinámica para Telesistema
 app.get('/live/telesistema', async (req, res) => {
   console.log('Iniciando extracción de Telesistema...');
-  const urlCanal = 'https://telesistema11.com.do/';
+  
+  // Apuntamos a la sección directa donde está el reproductor en vivo
+  const urlCanal = 'https://telesistema11.com.do/en-vivo';
   
   try {
     const streamUrl = await obtenerUrlCanal(urlCanal);
