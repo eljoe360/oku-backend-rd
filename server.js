@@ -45,12 +45,13 @@ const SPORTS_M3U_URL = process.env.SPORTS_M3U_URL || 'https://iptv-org.github.io
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
 /* =========================================================
-   FUENTES DIRECTAS ESTABLES
+   FUENTES DIRECTAS Y DE RESPALDO
 ========================================================= */
 const TELEMICRO_PLAYLIST = process.env.TELEMICRO_PLAYLIST || 'https://live2.telemicro.com.do/live/55/playlist.m3u8';
 const CANAL6_STREAM_URL  = process.env.CANAL6_STREAM_URL  || 'https://stream.elseis.do/canal6/master.m3u8';
 const CANAL7_STREAM_URL  = process.env.CANAL7_STREAM_URL  || 'https://hls.tvabierta.net/hls/007.m3u8';
 const CANAL8_STREAM_URL  = process.env.CANAL8_STREAM_URL  || 'http://190.122.104.210:5080/LiveApp/streams/telemedios.m3u8';
+const CANAL9_STREAM_URL  = process.env.CANAL9_STREAM_URL  || 'https://hls.tvabierta.net/hls/009.m3u8';
 const CANAL10_STREAM_URL = process.env.CANAL10_STREAM_URL || 'https://hls.tvabierta.net/hls/010.m3u8';
 const CANAL11_STREAM_URL = process.env.CANAL11_STREAM_URL || 'https://hls.tvabierta.net/hls/011.m3u8';
 const CANAL13_STREAM_URL = process.env.CANAL13_STREAM_URL || 'https://live2.telemicro.com.do/live/telecentrocast_1080p/chunks.m3u8';
@@ -59,10 +60,9 @@ const CANAL18_STREAM_URL = process.env.CANAL18_STREAM_URL || 'https://ss2.tvrdom
 const CANAL19_STREAM_URL = process.env.CANAL19_STREAM_URL || 'https://5790d294af2dc.streamlock.net/tvhdlive/tvhdlive/playlist.m3u8';
 const CANAL21_STREAM_URL = process.env.CANAL21_STREAM_URL || 'https://hls.tvabierta.net/hls/021.m3u8';
 
-/* =========================================================
-   IDENTIFICADORES DAILYMOTION
-========================================================= */
+/* IDENTIFICADORES DAILYMOTION */
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
+const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
 const CANAL12_VIDEO_ID = process.env.CANAL12_VIDEO_ID || 'xaio352';
 const CANAL23_VIDEO_ID = process.env.CANAL23_VIDEO_ID || 'x9imtbq';
 
@@ -175,7 +175,7 @@ async function extraerStreamDailymotion(videoId) {
             }
         }
     } catch (e) {
-        console.warn(`[Dailymotion API] Error al refrescar token para ID ${videoId}: ${e.message}`);
+        console.warn(`[Dailymotion API] Error para ID ${videoId}: ${e.message}`);
     }
 
     try {
@@ -213,7 +213,7 @@ async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
         const respuesta = await axios.get(streamUrl, {
             httpAgent: agenteParaUrl(streamUrl),
             httpsAgent: agenteParaUrl(streamUrl),
-            timeout: 10000,
+            timeout: 8000,
             responseType: 'text',
             headers
         });
@@ -239,9 +239,9 @@ async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.send(nuevasLineas.join('\n'));
+        return true;
     } catch (error) {
-        console.error('[Error Procesando M3U8]:', error.message);
-        res.status(500).send('Error procesando transmisión');
+        return false;
     }
 }
 
@@ -251,7 +251,8 @@ async function procesarPlaylistProxy(streamUrl, req, res, referer = '') {
 app.get('/api/proxy/subplaylist', async (req, res) => {
     const params = validarParametrosProxy(req, res);
     if (!params) return;
-    await procesarPlaylistProxy(params.url, req, res, params.ref);
+    const exito = await procesarPlaylistProxy(params.url, req, res, params.ref);
+    if (!exito) res.status(500).send('Error procesando transmisión');
 });
 
 app.get('/api/proxy/segment', async (req, res) => {
@@ -268,7 +269,7 @@ app.get('/api/proxy/segment', async (req, res) => {
         const respuesta = await axios.get(params.url, {
             httpAgent: agenteParaUrl(params.url),
             httpsAgent: agenteParaUrl(params.url),
-            timeout: 15000,
+            timeout: 10000,
             responseType: 'stream',
             headers
         });
@@ -283,7 +284,7 @@ app.get('/api/proxy/segment', async (req, res) => {
 });
 
 /* =========================================================
-   PARSER Y ENDPOINT DE CATÁLOGO DEPORTIVO M3U (IPTV-ORG)
+   PARSER Y ENDPOINT DE CATÁLOGO DEPORTIVO M3U
 ========================================================= */
 app.get('/api/deportes', async (req, res) => {
     try {
@@ -319,7 +320,6 @@ app.get('/api/deportes', async (req, res) => {
 
         res.json(canales);
     } catch (error) {
-        console.error('[Error Cargando M3U Deportes]:', error.message);
         res.status(500).json({ error: 'No se pudo cargar la lista de deportes M3U' });
     }
 });
@@ -354,7 +354,6 @@ async function obtenerListaCanalesProcesada(req) {
             return { ...canal, url: targetUrl };
         });
     } catch (error) {
-        console.error('[Error obteniendo JSON de canales]:', error.message);
         return [];
     }
 }
@@ -378,68 +377,87 @@ app.get('/', async (req, res) => {
 });
 
 /* =========================================================
-   ENDPOINTS INDIVIDUALES DE CANALES
+   ENDPOINTS CON SISTEMA DE RESPALDO INTELIGENTE (DAILYMOTION <-> DIRECTO)
 ========================================================= */
+
 app.get('/api/telemicro', async (req, res) => {
-    await procesarPlaylistProxy(TELEMICRO_PLAYLIST, req, res, 'https://telemicro.com.do/');
+    const exito = await procesarPlaylistProxy(TELEMICRO_PLAYLIST, req, res, 'https://telemicro.com.do/');
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
 app.get('/api/canal6', async (req, res) => {
-    await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
+    const exito = await procesarPlaylistProxy(CANAL6_STREAM_URL, req, res);
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
 app.get('/api/canal7', async (req, res) => {
-    await procesarPlaylistProxy(CANAL7_STREAM_URL, req, res);
+    const exito = await procesarPlaylistProxy(CANAL7_STREAM_URL, req, res);
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
 app.get('/api/canal8', async (req, res) => {
-    await procesarPlaylistProxy(CANAL8_STREAM_URL, req, res);
+    const exito = await procesarPlaylistProxy(CANAL8_STREAM_URL, req, res);
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
+/* CANAL 9: Daily -> Directo (009) */
 app.get('/api/canal9', async (req, res) => {
-    const streamUrl = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Señal no disponible para Canal 9');
-    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
+    const streamUrlDm = await extraerStreamDailymotion(CANAL9_VIDEO_ID);
+    if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
+    if (await procesarPlaylistProxy(CANAL9_STREAM_URL, req, res)) return;
+    res.status(503).send('Señal no disponible para Canal 9');
 });
 
 app.get('/api/canal10', async (req, res) => {
-    await procesarPlaylistProxy(CANAL10_STREAM_URL, req, res);
+    const exito = await procesarPlaylistProxy(CANAL10_STREAM_URL, req, res);
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
+/* CANAL 11: Daily -> Directo (011) */
 app.get('/api/canal11', async (req, res) => {
-    await procesarPlaylistProxy(CANAL11_STREAM_URL, req, res);
+    const streamUrlDm = await extraerStreamDailymotion(CANAL11_VIDEO_ID);
+    if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
+    if (await procesarPlaylistProxy(CANAL11_STREAM_URL, req, res)) return;
+    res.status(503).send('Señal no disponible para Canal 11');
 });
 
+/* CANAL 12: Daily -> Respaldo directo de TVAbierta (012 o similar si aplica) */
 app.get('/api/canal12', async (req, res) => {
-    const streamUrl = await extraerStreamDailymotion(CANAL12_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Señal no disponible para Canal 12');
-    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
+    const streamUrlDm = await extraerStreamDailymotion(CANAL12_VIDEO_ID);
+    if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
+    res.status(503).send('Señal no disponible para Canal 12');
 });
 
 app.get('/api/canal13', async (req, res) => {
-    await procesarPlaylistProxy(CANAL13_STREAM_URL, req, res, 'https://telemicro.com.do/');
+    const exito = await procesarPlaylistProxy(CANAL13_STREAM_URL, req, res, 'https://telemicro.com.do/');
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
 app.get('/api/canal15', async (req, res) => {
-    await procesarPlaylistProxy(CANAL15_STREAM_URL, req, res, 'https://telemicro.com.do/');
+    const exito = await procesarPlaylistProxy(CANAL15_STREAM_URL, req, res, 'https://telemicro.com.do/');
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
 app.get('/api/canal18', async (req, res) => {
-    await procesarPlaylistProxy(CANAL18_STREAM_URL, req, res);
+    const exito = await procesarPlaylistProxy(CANAL18_STREAM_URL, req, res);
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
 app.get('/api/canal19', async (req, res) => {
-    await procesarPlaylistProxy(CANAL19_STREAM_URL, req, res);
+    const exito = await procesarPlaylistProxy(CANAL19_STREAM_URL, req, res);
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
 app.get('/api/canal21', async (req, res) => {
-    await procesarPlaylistProxy(CANAL21_STREAM_URL, req, res);
+    const exito = await procesarPlaylistProxy(CANAL21_STREAM_URL, req, res);
+    if (!exito) res.status(500).send('Error en la señal');
 });
 
+/* CANAL 23: Daily -> Respaldo directo */
 app.get('/api/canal23', async (req, res) => {
-    const streamUrl = await extraerStreamDailymotion(CANAL23_VIDEO_ID);
-    if (!streamUrl) return res.status(503).send('Señal no disponible para Canal 23');
-    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
+    const streamUrlDm = await extraerStreamDailymotion(CANAL23_VIDEO_ID);
+    if (streamUrlDm && (await procesarPlaylistProxy(streamUrlDm, req, res, 'https://www.dailymotion.com/'))) return;
+    res.status(503).send('Señal no disponible para Canal 23');
 });
 
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
