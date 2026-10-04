@@ -12,7 +12,7 @@ app.disable('x-powered-by');
 
 
 // ============================================================
-// CONFIGURACIÓN GENERAL
+// CONFIGURACIÓN
 // ============================================================
 
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
@@ -21,6 +21,7 @@ let SECRET = process.env.PROXY_SECRET;
 
 if (!SECRET) {
     SECRET = crypto.randomBytes(32).toString('hex');
+
     console.warn(
         '[AVISO] PROXY_SECRET no definido. Se generó uno temporal.'
     );
@@ -28,7 +29,7 @@ if (!SECRET) {
 
 
 // ============================================================
-// HOSTS QUE NECESITAN TLS INSEGURO
+// HOSTS TLS
 // ============================================================
 
 const INSECURE_TLS_HOSTS = (
@@ -88,7 +89,7 @@ function agenteParaUrl(urlStr) {
 
 
 // ============================================================
-// CONFIGURACIÓN DE FUENTES
+// FUENTES
 // ============================================================
 
 const CANALES_JSON =
@@ -207,7 +208,6 @@ const CANAL33_STREAM_URL =
 
 // ============================================================
 // CANAL 36 - DAILY MOTION
-// NO SE GUARDA NINGÚN sec2(...) CADUCABLE
 // ============================================================
 
 const CANAL36_VIDEO_ID =
@@ -225,7 +225,16 @@ const CANAL37_STREAM_URL =
 
 
 // ============================================================
-// IDs DAILY MOTION
+// CANAL 63 - DIGITAL VISION
+// ============================================================
+
+const CANAL63_STREAM_URL =
+    process.env.CANAL63_STREAM_URL ||
+    'https://ss2.tvrdomi.com:1936/digitalvision/digitalvision/playlist.m3u8';
+
+
+// ============================================================
+// DAILY MOTION IDs
 // ============================================================
 
 const CANAL9_VIDEO_ID =
@@ -283,10 +292,11 @@ app.use((req, res, next) => {
 
 
 // ============================================================
-// RATE LIMIT SIMPLE
+// RATE LIMIT
 // ============================================================
 
 const rateMap = new Map();
+
 
 function rateLimit(req, res, next) {
 
@@ -299,7 +309,11 @@ function rateLimit(req, res, next) {
 
     const datos = rateMap.get(ip);
 
-    if (!datos || ahora - datos.time > 60000) {
+
+    if (
+        !datos ||
+        ahora - datos.time > 60000
+    ) {
 
         rateMap.set(ip, {
             count: 1,
@@ -309,7 +323,9 @@ function rateLimit(req, res, next) {
         return next();
     }
 
+
     datos.count++;
+
 
     if (datos.count > 300) {
 
@@ -318,14 +334,16 @@ function rateLimit(req, res, next) {
             .send('Demasiadas solicitudes');
     }
 
+
     next();
 }
+
 
 app.use(rateLimit);
 
 
 // ============================================================
-// HMAC
+// FIRMAS
 // ============================================================
 
 function crearFirma(url, ref = '') {
@@ -343,7 +361,10 @@ function comprobarFirma(url, ref, sig) {
         return false;
     }
 
-    const esperada = crearFirma(url, ref);
+
+    const esperada =
+        crearFirma(url, ref);
+
 
     try {
 
@@ -360,7 +381,7 @@ function comprobarFirma(url, ref, sig) {
 
 
 // ============================================================
-// AYUDAS M3U8
+// COMPROBAR M3U8
 // ============================================================
 
 function esM3U8(url) {
@@ -385,54 +406,54 @@ async function comprobarM3U8(
         return false;
     }
 
+
     try {
 
-        const respuesta = await axios.get(
-            streamUrl,
-            {
-                httpAgent: agenteParaUrl(streamUrl),
-                httpsAgent: agenteParaUrl(streamUrl),
+        const respuesta =
+            await axios.get(
+                streamUrl,
+                {
+                    httpAgent:
+                        agenteParaUrl(streamUrl),
 
-                timeout: 7000,
+                    httpsAgent:
+                        agenteParaUrl(streamUrl),
 
-                responseType: 'text',
+                    timeout: 7000,
 
-                headers: {
-                    'User-Agent': USER_AGENT,
+                    responseType: 'text',
 
-                    'Referer':
-                        videoId
-                            ? `https://www.dailymotion.com/video/${videoId}`
-                            : undefined
-                },
+                    headers: {
+                        'User-Agent':
+                            USER_AGENT,
 
-                validateStatus:
-                    status =>
-                        status >= 200 &&
-                        status < 400
-            }
-        );
+                        'Referer':
+                            videoId
+                                ? `https://www.dailymotion.com/video/${videoId}`
+                                : undefined
+                    },
+
+                    validateStatus:
+                        status =>
+                            status >= 200 &&
+                            status < 400
+                }
+            );
 
 
         const contenido =
             String(respuesta.data || '');
 
 
-        if (contenido.includes('#EXTM3U')) {
-            return true;
-        }
-
-
-        console.warn(
-            `[M3U8] ${streamUrl} respondió sin #EXTM3U`
+        return contenido.includes(
+            '#EXTM3U'
         );
-
-        return false;
 
     } catch (e) {
 
         console.warn(
-            `[M3U8] No se pudo verificar: ${e.message}`
+            '[M3U8] Error verificando:',
+            e.message
         );
 
         return false;
@@ -472,14 +493,20 @@ function obtenerDailymotionCache(
 ) {
 
     const dato =
-        dmCache.get(`dm_${videoId}`);
+        dmCache.get(
+            `dm_${videoId}`
+        );
+
 
     if (!dato) {
         return null;
     }
 
 
-    if (Date.now() > dato.expires) {
+    if (
+        Date.now() >
+        dato.expires
+    ) {
 
         dmCache.delete(
             `dm_${videoId}`
@@ -494,7 +521,7 @@ function obtenerDailymotionCache(
 
 
 // ============================================================
-// EXTRACTOR DAILY MOTION
+// EXTRAER DAILY MOTION
 // ============================================================
 
 async function extraerStreamDailymotion(
@@ -502,13 +529,15 @@ async function extraerStreamDailymotion(
 ) {
 
     const cache =
-        obtenerDailymotionCache(videoId);
+        obtenerDailymotionCache(
+            videoId
+        );
 
 
     if (cache) {
 
         console.log(
-            `[Dailymotion] Usando cache para ${videoId}`
+            `[Dailymotion] Cache: ${videoId}`
         );
 
         return cache;
@@ -516,12 +545,12 @@ async function extraerStreamDailymotion(
 
 
     console.log(
-        `[Dailymotion] Buscando URL nueva para ${videoId}...`
+        `[Dailymotion] Buscando URL nueva: ${videoId}`
     );
 
 
     // --------------------------------------------------------
-    // 1. PLAYER METADATA
+    // METADATA
     // --------------------------------------------------------
 
     try {
@@ -545,12 +574,7 @@ async function extraerStreamDailymotion(
 
                         'Accept':
                             'application/json,text/plain,*/*'
-                    },
-
-                    validateStatus:
-                        status =>
-                            status >= 200 &&
-                            status < 400
+                    }
                 }
             );
 
@@ -562,7 +586,6 @@ async function extraerStreamDailymotion(
         const candidatos = [];
 
 
-        // qualities.auto
         if (
             data &&
             data.qualities &&
@@ -575,7 +598,10 @@ async function extraerStreamDailymotion(
 
             if (Array.isArray(auto)) {
 
-                for (const item of auto) {
+                for (
+                    const item
+                    of auto
+                ) {
 
                     if (
                         typeof item === 'string'
@@ -597,29 +623,39 @@ async function extraerStreamDailymotion(
         }
 
 
-        // Todas las qualities
         if (
             data &&
             data.qualities
         ) {
 
             for (
-                const calidad of Object.values(
+                const calidad
+                of Object.values(
                     data.qualities
                 )
             ) {
 
-                if (!Array.isArray(calidad)) {
+                if (
+                    !Array.isArray(
+                        calidad
+                    )
+                ) {
                     continue;
                 }
 
-                for (const item of calidad) {
+
+                for (
+                    const item
+                    of calidad
+                ) {
 
                     if (
                         typeof item === 'string'
                     ) {
 
-                        candidatos.push(item);
+                        candidatos.push(
+                            item
+                        );
 
                     } else if (
                         item &&
@@ -636,38 +672,48 @@ async function extraerStreamDailymotion(
 
 
         const unicos =
-            [...new Set(candidatos)]
-                .filter(esM3U8);
+            [
+                ...new Set(candidatos)
+            ]
+            .filter(esM3U8);
 
 
-        // Preferir 480p
         const ordenados =
-            unicos.sort((a, b) => {
+            unicos.sort(
+                (a, b) => {
 
-                const a480 =
-                    a.includes('480');
+                    const a480 =
+                        a.includes('480');
 
-                const b480 =
-                    b.includes('480');
+                    const b480 =
+                        b.includes('480');
 
-                if (a480 && !b480) {
-                    return -1;
+
+                    if (
+                        a480 &&
+                        !b480
+                    ) {
+                        return -1;
+                    }
+
+
+                    if (
+                        !a480 &&
+                        b480
+                    ) {
+                        return 1;
+                    }
+
+
+                    return 0;
                 }
-
-                if (!a480 && b480) {
-                    return 1;
-                }
-
-                return 0;
-            });
-
-
-        for (const url of ordenados) {
-
-            console.log(
-                `[Dailymotion] Probando: ${url}`
             );
 
+
+        for (
+            const url
+            of ordenados
+        ) {
 
             const valido =
                 await comprobarM3U8(
@@ -683,10 +729,6 @@ async function extraerStreamDailymotion(
                     url
                 );
 
-                console.log(
-                    `[Dailymotion] M3U8 válido encontrado para ${videoId}`
-                );
-
                 return url;
             }
         }
@@ -694,14 +736,13 @@ async function extraerStreamDailymotion(
     } catch (e) {
 
         console.warn(
-            `[Dailymotion] Metadata falló para ${videoId}:`,
-            e.message
+            `[Dailymotion] Metadata falló: ${e.message}`
         );
     }
 
 
     // --------------------------------------------------------
-    // 2. API LIVE
+    // API LIVE
     // --------------------------------------------------------
 
     try {
@@ -753,14 +794,13 @@ async function extraerStreamDailymotion(
     } catch (e) {
 
         console.warn(
-            `[Dailymotion] API live falló para ${videoId}:`,
-            e.message
+            `[Dailymotion] API live falló: ${e.message}`
         );
     }
 
 
     // --------------------------------------------------------
-    // 3. API HLS NORMAL
+    // API HLS
     // --------------------------------------------------------
 
     try {
@@ -789,7 +829,8 @@ async function extraerStreamDailymotion(
 
         const url =
             respuesta.data &&
-            respuesta.data.stream_hls_url;
+            respuesta.data
+                .stream_hls_url;
 
 
         if (
@@ -811,22 +852,17 @@ async function extraerStreamDailymotion(
     } catch (e) {
 
         console.warn(
-            `[Dailymotion] API HLS falló para ${videoId}:`,
-            e.message
+            `[Dailymotion] API HLS falló: ${e.message}`
         );
     }
 
-
-    console.error(
-        `[Dailymotion] No se encontró M3U8 válido para ${videoId}`
-    );
 
     return null;
 }
 
 
 // ============================================================
-// PROXY DE PLAYLIST
+// PROXY PLAYLIST
 // ============================================================
 
 async function procesarPlaylistProxy(
@@ -839,9 +875,13 @@ async function procesarPlaylistProxy(
     try {
 
         const headers = {
-            'User-Agent': USER_AGENT,
+            'User-Agent':
+                USER_AGENT,
+
             'Accept':
-                'application/vnd.apple.mpegurl,application/x-mpegURL,text/plain,*/*'
+                'application/vnd.apple.mpegurl,' +
+                'application/x-mpegURL,' +
+                'text/plain,*/*'
         };
 
 
@@ -850,14 +890,16 @@ async function procesarPlaylistProxy(
         }
 
 
-        const origen =
-            referer
-                ? new URL(referer).origin
-                : '';
+        if (referer) {
 
+            try {
 
-        if (origen) {
-            headers.Origin = origen;
+                headers.Origin =
+                    new URL(
+                        referer
+                    ).origin;
+
+            } catch {}
         }
 
 
@@ -873,7 +915,8 @@ async function procesarPlaylistProxy(
 
                     timeout: 15000,
 
-                    responseType: 'text',
+                    responseType:
+                        'text',
 
                     headers,
 
@@ -886,15 +929,19 @@ async function procesarPlaylistProxy(
 
 
         let contenido =
-            String(respuesta.data || '');
+            String(
+                respuesta.data || ''
+            );
 
 
         if (
-            !contenido.includes('#EXTM3U')
+            !contenido.includes(
+                '#EXTM3U'
+            )
         ) {
 
             console.error(
-                `[PROXY] La respuesta no es M3U8: ${streamUrl}`
+                `[PROXY] No es M3U8: ${streamUrl}`
             );
 
             return false;
@@ -908,13 +955,18 @@ async function procesarPlaylistProxy(
 
 
         const lineas =
-            contenido.split(/\r?\n/);
+            contenido.split(
+                /\r?\n/
+            );
 
 
         const resultado = [];
 
 
-        for (let linea of lineas) {
+        for (
+            let linea
+            of lineas
+        ) {
 
             const texto =
                 linea.trim();
@@ -925,7 +977,10 @@ async function procesarPlaylistProxy(
                 texto.startsWith('#')
             ) {
 
-                resultado.push(linea);
+                resultado.push(
+                    linea
+                );
+
                 continue;
             }
 
@@ -943,7 +998,10 @@ async function procesarPlaylistProxy(
 
             } catch {
 
-                resultado.push(linea);
+                resultado.push(
+                    linea
+                );
+
                 continue;
             }
 
@@ -959,35 +1017,30 @@ async function procesarPlaylistProxy(
                 );
 
 
+            const base =
+                PUBLIC_URL ||
+                `${req.protocol}://${req.get('host')}`;
+
+
             if (
                 urlFinal.includes('.m3u8') ||
                 urlFinal.includes('/manifest/')
             ) {
 
-                const proxyUrl =
-                    `${PUBLIC_URL || `${req.protocol}://${req.get('host')}`}` +
-                    `/api/proxy/subplaylist` +
+                resultado.push(
+                    `${base}/api/proxy/subplaylist` +
                     `?url=${encodeURIComponent(urlFinal)}` +
                     `&ref=${encodeURIComponent(ref)}` +
-                    `&sig=${sig}`;
-
-
-                resultado.push(
-                    proxyUrl
+                    `&sig=${sig}`
                 );
 
             } else {
 
-                const proxyUrl =
-                    `${PUBLIC_URL || `${req.protocol}://${req.get('host')}`}` +
-                    `/api/proxy/segment` +
+                resultado.push(
+                    `${base}/api/proxy/segment` +
                     `?url=${encodeURIComponent(urlFinal)}` +
                     `&ref=${encodeURIComponent(ref)}` +
-                    `&sig=${sig}`;
-
-
-                resultado.push(
-                    proxyUrl
+                    `&sig=${sig}`
                 );
             }
         }
@@ -1002,10 +1055,12 @@ async function procesarPlaylistProxy(
             'application/vnd.apple.mpegurl'
         );
 
+
         res.setHeader(
             'Cache-Control',
             'no-cache, no-store, must-revalidate'
         );
+
 
         res.setHeader(
             'Access-Control-Allow-Origin',
@@ -1013,14 +1068,17 @@ async function procesarPlaylistProxy(
         );
 
 
-        res.send(contenido);
+        res.send(
+            contenido
+        );
+
 
         return true;
 
     } catch (e) {
 
         console.error(
-            `[PROXY] Error procesando playlist:`,
+            '[PROXY] Error:',
             e.message
         );
 
@@ -1030,7 +1088,7 @@ async function procesarPlaylistProxy(
 
 
 // ============================================================
-// PROXY SUBPLAYLIST
+// SUBPLAYLIST
 // ============================================================
 
 app.get(
@@ -1056,7 +1114,9 @@ app.get(
 
             return res
                 .status(403)
-                .send('Firma inválida');
+                .send(
+                    'Firma inválida'
+                );
         }
 
 
@@ -1071,7 +1131,7 @@ app.get(
 
         if (!ok) {
 
-            return res
+            res
                 .status(502)
                 .send(
                     'Error obteniendo subplaylist'
@@ -1082,7 +1142,7 @@ app.get(
 
 
 // ============================================================
-// PROXY SEGMENT
+// SEGMENTOS
 // ============================================================
 
 app.get(
@@ -1108,7 +1168,9 @@ app.get(
 
             return res
                 .status(403)
-                .send('Firma inválida');
+                .send(
+                    'Firma inválida'
+                );
         }
 
 
@@ -1129,7 +1191,9 @@ app.get(
                 try {
 
                     headers.Origin =
-                        new URL(ref).origin;
+                        new URL(
+                            ref
+                        ).origin;
 
                 } catch {}
             }
@@ -1181,7 +1245,9 @@ app.get(
             );
 
 
-            respuesta.data.pipe(res);
+            respuesta.data.pipe(
+                res
+            );
 
         } catch (e) {
 
@@ -1289,7 +1355,7 @@ app.get(
 
 
 // ============================================================
-// CANAL 9 - DAILY MOTION
+// CANAL 9
 // ============================================================
 
 app.get(
@@ -1326,6 +1392,7 @@ app.get(
             dmCache.delete(
                 `dm_${CANAL9_VIDEO_ID}`
             );
+
 
             res
                 .status(503)
@@ -1366,7 +1433,7 @@ app.get(
 
 
 // ============================================================
-// CANAL 11 - DAILY MOTION
+// CANAL 11
 // ============================================================
 
 app.get(
@@ -1404,6 +1471,7 @@ app.get(
                 `dm_${CANAL11_VIDEO_ID}`
             );
 
+
             res
                 .status(503)
                 .send(
@@ -1415,7 +1483,7 @@ app.get(
 
 
 // ============================================================
-// CANAL 12 - DAILY MOTION
+// CANAL 12
 // ============================================================
 
 app.get(
@@ -1452,6 +1520,7 @@ app.get(
             dmCache.delete(
                 `dm_${CANAL12_VIDEO_ID}`
             );
+
 
             res
                 .status(503)
@@ -1604,7 +1673,7 @@ app.get(
 
 
 // ============================================================
-// CANAL 23 - DAILY MOTION
+// CANAL 23
 // ============================================================
 
 app.get(
@@ -1641,6 +1710,7 @@ app.get(
             dmCache.delete(
                 `dm_${CANAL23_VIDEO_ID}`
             );
+
 
             res
                 .status(503)
@@ -1766,7 +1836,6 @@ app.get(
 
 // ============================================================
 // CANAL 36 - DAILY MOTION
-// SIN BACKUP sec2 CADUCABLE
 // ============================================================
 
 app.get(
@@ -1779,6 +1848,7 @@ app.get(
 
 
         // PRIMER INTENTO
+
         let streamUrlDm =
             await extraerStreamDailymotion(
                 CANAL36_VIDEO_ID
@@ -1787,7 +1857,7 @@ app.get(
 
         if (streamUrlDm) {
 
-            const dinamicoOK =
+            const ok =
                 await procesarPlaylistProxy(
                     streamUrlDm,
                     req,
@@ -1796,7 +1866,7 @@ app.get(
                 );
 
 
-            if (dinamicoOK) {
+            if (ok) {
                 return;
             }
 
@@ -1813,6 +1883,7 @@ app.get(
 
 
         // SEGUNDO INTENTO
+
         console.log(
             '[CANAL 36] Segundo intento de obtener URL nueva...'
         );
@@ -1826,7 +1897,7 @@ app.get(
 
         if (streamUrlDm) {
 
-            const segundoIntento =
+            const ok2 =
                 await procesarPlaylistProxy(
                     streamUrlDm,
                     req,
@@ -1835,7 +1906,7 @@ app.get(
                 );
 
 
-            if (segundoIntento) {
+            if (ok2) {
                 return;
             }
 
@@ -1847,7 +1918,7 @@ app.get(
 
 
         console.error(
-            '[CANAL 36] No se pudo obtener un M3U8 válido de Dailymotion.'
+            '[CANAL 36] No se pudo obtener M3U8 válido.'
         );
 
 
@@ -1868,7 +1939,6 @@ app.get(
     '/api/canal37',
     async (req, res) => {
 
-        // PRIMERO intenta Dailymotion dinámico
         const dinamico =
             await extraerStreamDailymotion(
                 CANAL37_VIDEO_ID
@@ -1897,7 +1967,6 @@ app.get(
         }
 
 
-        // FALLBACK AL MANIFEST
         console.warn(
             '[CANAL 37] Usando manifest de respaldo.'
         );
@@ -1924,7 +1993,45 @@ app.get(
 
 
 // ============================================================
-// OBTENER CANALES DEL JSON
+// CANAL 63 - DIGITAL VISION
+// ============================================================
+
+app.get(
+    '/api/canal63',
+    async (req, res) => {
+
+        console.log(
+            '[CANAL 63] Cargando Digital Vision...'
+        );
+
+
+        const ok =
+            await procesarPlaylistProxy(
+                CANAL63_STREAM_URL,
+                req,
+                res
+            );
+
+
+        if (!ok) {
+
+            console.error(
+                '[CANAL 63] No se pudo cargar Digital Vision.'
+            );
+
+
+            res
+                .status(500)
+                .send(
+                    'Error en la señal del Canal 63'
+                );
+        }
+    }
+);
+
+
+// ============================================================
+// OBTENER CANALES JSON
 // ============================================================
 
 async function obtenerListaCanalesProcesada(
@@ -1938,6 +2045,7 @@ async function obtenerListaCanalesProcesada(
                 CANALES_JSON,
                 {
                     timeout: 15000,
+
                     headers: {
                         'User-Agent':
                             USER_AGENT
@@ -1951,7 +2059,6 @@ async function obtenerListaCanalesProcesada(
 
 
         if (!Array.isArray(canales)) {
-
             return canales;
         }
 
@@ -1961,40 +2068,40 @@ async function obtenerListaCanalesProcesada(
             `${req.protocol}://${req.get('host')}`;
 
 
-        return canales.map(canal => {
+        return canales.map(
+            canal => {
 
-            const nuevo = {
-                ...canal
-            };
+                const nuevo = {
+                    ...canal
+                };
 
 
-            for (
-                const [clave, valor]
-                of Object.entries(canal)
-            ) {
-
-                if (
-                    clave.endsWith('_web') &&
-                    valor === true
+                for (
+                    const [clave, valor]
+                    of Object.entries(canal)
                 ) {
 
-                    const numero =
-                        clave
-                            .replace(
+                    if (
+                        clave.endsWith('_web') &&
+                        valor === true
+                    ) {
+
+                        const numero =
+                            clave.replace(
                                 '_web',
                                 ''
                             );
 
 
-                    nuevo.url =
-                        `${base}/api/${numero}`;
+                        nuevo.url =
+                            `${base}/api/${numero}`;
+                    }
                 }
+
+
+                return nuevo;
             }
-
-
-            return nuevo;
-        });
-
+        );
 
     } catch (e) {
 
@@ -2025,7 +2132,9 @@ app.get(
                 );
 
 
-            res.json(canales);
+            res.json(
+                canales
+            );
 
         } catch {
 
@@ -2096,7 +2205,7 @@ app.get(
 
 
 // ============================================================
-// HEALTH CHECK
+// INICIO
 // ============================================================
 
 app.get(
@@ -2106,14 +2215,23 @@ app.get(
         res.json({
             ok: true,
             server: 'Roku IPTV Proxy',
+
             canal33:
                 '/api/canal33',
+
             canal36:
-                '/api/canal36'
+                '/api/canal36',
+
+            canal63:
+                '/api/canal63'
         });
     }
 );
 
+
+// ============================================================
+// HEALTH
+// ============================================================
 
 app.get(
     '/health',
@@ -2146,7 +2264,7 @@ app.use(
 
 
 // ============================================================
-// ERRORES GENERALES
+// ERROR GENERAL
 // ============================================================
 
 app.use(
@@ -2158,9 +2276,7 @@ app.use(
         );
 
 
-        if (
-            !res.headersSent
-        ) {
+        if (!res.headersSent) {
 
             res
                 .status(500)
@@ -2174,7 +2290,7 @@ app.use(
 
 
 // ============================================================
-// INICIAR SERVIDOR
+// SERVIDOR
 // ============================================================
 
 app.listen(
@@ -2186,11 +2302,15 @@ app.listen(
         );
 
         console.log(
-            `Canal 33: /api/canal33`
+            'Canal 33: /api/canal33'
         );
 
         console.log(
-            `Canal 36: /api/canal36`
+            'Canal 36: /api/canal36'
+        );
+
+        console.log(
+            'Canal 63: /api/canal63'
         );
     }
 );
