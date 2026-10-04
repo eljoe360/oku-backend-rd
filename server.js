@@ -63,6 +63,7 @@ const CANAL21_STREAM_URL = process.env.CANAL21_STREAM_URL || 'https://hls.tvabie
 const CANAL9_VIDEO_ID  = process.env.CANAL9_VIDEO_ID  || 'x7gy059';
 const CANAL11_VIDEO_ID = process.env.CANAL11_VIDEO_ID || 'x80ac48';
 const CANAL12_VIDEO_ID = process.env.CANAL12_VIDEO_ID || 'xaio352';
+const CANAL23_VIDEO_ID = process.env.CANAL23_VIDEO_ID || 'x9imtbq';
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -303,6 +304,7 @@ app.get('/api/canales', async (req, res) => {
             else if (canal.canal18_web) targetUrl = `${baseUrl}/api/canal18`;
             else if (canal.canal19_web) targetUrl = `${baseUrl}/api/canal19`;
             else if (canal.canal21_web) targetUrl = `${baseUrl}/api/canal21`;
+            else if (canal.canal23_web) targetUrl = `${baseUrl}/api/canal23`;
 
             return { ...canal, url: targetUrl };
         });
@@ -369,6 +371,12 @@ app.get('/api/canal19', async (req, res) => {
 
 app.get('/api/canal21', async (req, res) => {
     await procesarPlaylistProxy(CANAL21_STREAM_URL, req, res);
+});
+
+app.get('/api/canal23', async (req, res) => {
+    const streamUrl = await extraerStreamDailymotion(CANAL23_VIDEO_ID);
+    if (!streamUrl) return res.status(503).send('Señal no disponible temporalmente para Canal 23');
+    await procesarPlaylistProxy(streamUrl, req, res, 'https://www.dailymotion.com/');
 });
 
 app.get('/', (req, res) => res.send('ROKU Backend RD OK'));
