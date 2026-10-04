@@ -110,7 +110,9 @@ setInterval(() => {
 ========================================================= */
 function obtenerBaseUrl(req) {
     if (PUBLIC_URL) return PUBLIC_URL;
-    return `${req.protocol}://${req.get('host')}`;
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    return `${proto}://${host}`;
 }
 
 function firmar(url, ref = '') {
@@ -327,7 +329,7 @@ app.get('/api/deportes', async (req, res) => {
 });
 
 /* =========================================================
-   RUTAS DE LOS CANALES Y CATÁLOGOS
+   RUTAS DE LOS CANALES Y CATÁLOGOS (CON RESPALDO AUTOMÁTICO TVABIERTA)
 ========================================================= */
 async function obtenerListaCanalesProcesada(req) {
     const baseUrl = obtenerBaseUrl(req);
@@ -338,24 +340,24 @@ async function obtenerListaCanalesProcesada(req) {
         return canales.map(canal => {
             let targetUrl = canal.url;
 
-            if (canal.telemicro_web) targetUrl = `${baseUrl}/api/telemicro`;
-            else if (canal.canal6_web) targetUrl = `${baseUrl}/api/canal6`;
-            else if (canal.canal7_web) targetUrl = `${baseUrl}/api/canal7`;
-            else if (canal.canal8_web) targetUrl = `${baseUrl}/api/canal8`;
-            else if (canal.canal9_web) targetUrl = `${baseUrl}/api/canal9`;
-            else if (canal.canal10_web) targetUrl = `${baseUrl}/api/canal10`;
-            else if (canal.canal11_web) targetUrl = `${baseUrl}/api/canal11`;
-            else if (canal.canal12_web) targetUrl = `${baseUrl}/api/canal12`;
-            else if (canal.canal13_web) targetUrl = `${baseUrl}/api/canal13`;
-            else if (canal.canal15_web) targetUrl = `${baseUrl}/api/canal15`;
-            else if (canal.canal18_web) targetUrl = `${baseUrl}/api/canal18`;
-            else if (canal.canal19_web) targetUrl = `${baseUrl}/api/canal19`;
-            else if (canal.canal21_web) targetUrl = `${baseUrl}/api/canal21`;
-            else if (canal.canal23_web) targetUrl = `${baseUrl}/api/canal23`;
+            // 1. Intentar buscar si tiene configurado un endpoint backend (ej: canal2_web, telemicro_web)
+            const claveWeb = Object.keys(canal).find(k => k.endsWith('_web') && canal[k]);
+            if (claveWeb) {
+                const nombreApi = claveWeb.replace('_web', '');
+                targetUrl = `${baseUrl}/api/${nombreApi}`;
+            }
+
+            // 2. Si no tiene url o el backend falla, aplicar automáticamente el respaldo de tvabierta
+            // formateando el número a 3 dígitos (ej: 9 -> 009, 11 -> 011)
+            if (!targetUrl && canal.numero) {
+                const numeroFormateado = String(canal.numero).padStart(3, '0');
+                targetUrl = `https://hls.tvabierta.net/hls/${numeroFormateado}.m3u8`;
+            }
 
             return { ...canal, url: targetUrl };
         });
     } catch (error) {
+        console.error("Error cargando channels.json:", error.message);
         return [];
     }
 }
